@@ -1,0 +1,8 @@
+/.gradle
+/.idea
+/common/build
+/fabric/build
+/neoforge/build
+/neoforge/.gradle
+/fabric/.gradle
+/common/.gradle

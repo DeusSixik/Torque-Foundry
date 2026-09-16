@@ -1,0 +1,15 @@
+pluginManagement {
+    repositories {
+        maven { url = uri("https://jitpack.io") }
+        maven { url "https://maven.fabricmc.net/" }
+        maven { url "https://maven.architectury.dev/" }
+        maven { url "https://files.minecraftforge.net/maven/" }
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'torque_foundry'
+
+include 'common'
+include 'fabric'
+include 'neoforge'
