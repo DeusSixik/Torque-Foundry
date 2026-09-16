@@ -8,4 +8,9 @@ public final class MechanicalPowerConstants {
 
     public static final long PI2_60_NUM = 355;
     public static final long PI2_60_DEN = 3390;
+
+    // 477 / 1_000_000
+    // dt * 60 / (2 * PI)
+    public static final long ACCEL_NUM = 477;
+    public static final long ACCEL_DEN = 1_000_000;
 }

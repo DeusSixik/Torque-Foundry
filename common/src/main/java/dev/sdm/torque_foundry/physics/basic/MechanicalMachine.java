@@ -4,6 +4,10 @@ import net.minecraft.core.Direction;
 
 public class MechanicalMachine {
 
+    public static MechanicalMachine from(long requiredSpeed, long requiredTorque) {
+        return from(requiredSpeed, requiredTorque, null);
+    }
+
     public static MechanicalMachine from(long requiredSpeed, long requiredTorque, RotationDirection direction) {
         MechanicalPower req = MechanicalPower.from(requiredSpeed, requiredTorque);
         return new MechanicalMachine(req, direction == null ? -1 : direction.index);
@@ -14,6 +18,8 @@ public class MechanicalMachine {
         return new MechanicalMachine(req, direction == null ? -1 : direction.index);
     }
 
+    protected static final Direction[] EMPTY_DIRECTIONS = new Direction[0];
+
     // required храним как MechanicalPower — переиспользуем его SCALE-логику,
     // а не дублируем формулы конверсии тут
     protected final MechanicalPower required;
@@ -21,16 +27,13 @@ public class MechanicalMachine {
     protected long groupIndex = -1;
     protected int groupElementIndex = -1;
 
-    protected Direction[] inputDirections = new Direction[] { Direction.SOUTH };
-    protected Direction[] outputDirections = new Direction[] { Direction.NORTH };
+    protected Direction[] inputDirections = EMPTY_DIRECTIONS;
+    protected Direction[] outputDirections = EMPTY_DIRECTIONS;
 
     protected MechanicalMachine(MechanicalPower required, byte requiredDirection) {
         this.required = required;
         this.requiredDirection = requiredDirection;
-    }
-
-    public static MechanicalMachine from(long requiredSpeed, long requiredTorque) {
-        return from(requiredSpeed, requiredTorque, null);
+        createDirections();
     }
 
     public boolean canWork(MechanicalPower input) {
@@ -60,5 +63,18 @@ public class MechanicalMachine {
 
     public int getGroupElementIndex() {
         return groupElementIndex;
+    }
+
+    protected void createDirections() {
+        inputDirections = new Direction[] { Direction.SOUTH };
+        outputDirections = new Direction[] { Direction.NORTH };
+    }
+
+    public Direction[] getInputDirections() {
+        return inputDirections;
+    }
+
+    public Direction[] getOutputDirections() {
+        return outputDirections;
     }
 }
