@@ -8,6 +8,7 @@ import dev.sdm.torque_foundry.api.block.MechanicalBlock;
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.core.machine.GeneratorMachine;
+import dev.sdm.torque_foundry.core.network.ClientGroupCache;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
@@ -110,12 +111,19 @@ public final class ClientOverlay {
         ImGui.text("Group ID: " + (groupId == -1 ? "none" : groupId));
 
         if (groupId != -1) {
-            final MechanicalGroup group = MechanicalGroupManager.getGroup(groupId);
-            if (group != null) {
+            final Integer syncedMembers = ClientGroupCache.getMembers(groupId);
+            final MechanicalGroup group = syncedMembers == null
+                    ? MechanicalGroupManager.getGroup(groupId)
+                    : null;
+
+            if (syncedMembers != null) {
+                ImGui.text("Members: " + syncedMembers + " (synced)");
+                ImGui.text("Slot in group: " + machine.getGroupElementIndex());
+            } else if (group != null) {
                 ImGui.text("Members: " + group.getSize());
                 ImGui.text("Slot in group: " + machine.getGroupElementIndex());
             } else {
-                ImGui.textDisabled("Group " + groupId + " not registered (stale client state)");
+                ImGui.textDisabled("Group " + groupId + " not synced yet");
             }
         }
 

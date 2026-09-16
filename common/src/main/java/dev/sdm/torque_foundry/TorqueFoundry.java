@@ -4,6 +4,8 @@ import com.mojang.logging.LogUtils;
 import dev.architectury.platform.Platform;
 import dev.sdm.torque_foundry.core.block.TFBlockEntities;
 import dev.sdm.torque_foundry.core.block.TFBlocks;
+import dev.sdm.torque_foundry.core.data.MechanicalGroupEvents;
+import dev.sdm.torque_foundry.core.network.TFNetworking;
 import dev.sdm.torque_foundry.debug.physics.DebugRegisters;
 import net.fabricmc.api.EnvType;
 import org.slf4j.Logger;
@@ -18,6 +20,8 @@ public final class TorqueFoundry {
 
         TFBlocks.register();
         TFBlockEntities.register();
+        TFNetworking.register();
+        MechanicalGroupEvents.register();
 
         if(Platform.getEnv() == EnvType.CLIENT) {
             DebugRegisters.tryInstall();

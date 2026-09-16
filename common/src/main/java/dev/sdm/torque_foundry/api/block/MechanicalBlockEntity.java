@@ -1,9 +1,14 @@
 package dev.sdm.torque_foundry.api.block;
 
+import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
+import dev.sdm.torque_foundry.core.network.ClientGroupCache;
+import dev.sdm.torque_foundry.core.network.TFNetworking;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.basic.RotationDirection;
+import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -21,6 +26,33 @@ public class MechanicalBlockEntity extends BlockEntity {
 
         final MechanicalPower power = block.power;
         this.machine = createMachine(power);
+        this.machine.setBlockPos(blockPos);
+    }
+
+    /**
+     * Серверный тик: ленивая (пере)регистрация машины в группе.
+     * Срабатывает после любой загрузки чанка — старт сервера,
+     * подгрузка чанков, перезагрузка измерения.
+     */
+    public void serverTick() {
+        if (this.level == null || this.level.isClientSide) {
+            return;
+        }
+
+        if (this.machine.getGroupIndex() == -1) {
+            final MechanicalGroup group = MechanicalGroupManager.createOrAdd(this.level, this);
+            TFNetworking.syncGroup((ServerLevel) this.level, group, this.worldPosition);
+        }
+    }
+
+    /**
+     * Клиентский тик: до применяет данные группы из кэша,
+     * если пакет пришёл раньше, чем догрузился чанк.
+     */
+    public void clientTick() {
+        if (this.machine.getGroupIndex() == -1) {
+            ClientGroupCache.applyTo(this);
+        }
     }
 
     protected MechanicalMachine createMachine(MechanicalPower power) {

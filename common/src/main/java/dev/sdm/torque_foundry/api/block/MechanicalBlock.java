@@ -1,8 +1,11 @@
 package dev.sdm.torque_foundry.api.block;
 
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
+import dev.sdm.torque_foundry.core.network.TFNetworking;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -34,18 +37,30 @@ public abstract class MechanicalBlock extends BaseEntityBlock {
     public void setPlacedBy(Level level, BlockPos blockPos, BlockState blockState, @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, blockPos, blockState, placer, stack);
 
+        if (level.isClientSide) {
+            return;
+        }
+
         final BlockEntity entity = level.getBlockEntity(blockPos);
         if (entity instanceof MechanicalBlockEntity mechanicalBlock) {
-            MechanicalGroupManager.createOrAdd(level, mechanicalBlock);
+            final MechanicalGroup group = MechanicalGroupManager.createOrAdd(level, mechanicalBlock);
+            TFNetworking.syncGroup((ServerLevel) level, group, blockPos);
         }
     }
 
     @Override
     protected void onRemove(BlockState blockState, Level level, BlockPos blockPos, BlockState newState, boolean movedByPiston) {
-        if (!blockState.is(newState.getBlock())) {
+        if (!blockState.is(newState.getBlock()) && !level.isClientSide) {
             final BlockEntity entity = level.getBlockEntity(blockPos);
             if (entity instanceof MechanicalBlockEntity mechanicalBlock) {
-                MechanicalGroupManager.remove(mechanicalBlock);
+                final long groupId = mechanicalBlock.machine.getGroupIndex();
+                final MechanicalGroup group = groupId == -1 ? null : MechanicalGroupManager.getGroup(groupId);
+
+                if (MechanicalGroupManager.remove(mechanicalBlock)) {
+                    TFNetworking.syncGroupRemoved((ServerLevel) level, groupId, blockPos);
+                } else if (group != null) {
+                    TFNetworking.syncGroup((ServerLevel) level, group, blockPos);
+                }
             }
         }
         super.onRemove(blockState, level, blockPos, newState, movedByPiston);

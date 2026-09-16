@@ -1,5 +1,6 @@
 package dev.sdm.torque_foundry.physics.basic;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
 public class MechanicalMachine {
@@ -29,6 +30,19 @@ public class MechanicalMachine {
 
     protected Direction[] inputDirections = EMPTY_DIRECTIONS;
     protected Direction[] outputDirections = EMPTY_DIRECTIONS;
+
+    /**
+     * Позиция блока-владельца (null для headless-машин вне мира).
+     */
+    protected BlockPos pos;
+
+    public BlockPos getBlockPos() {
+        return pos;
+    }
+
+    public void setBlockPos(BlockPos pos) {
+        this.pos = pos;
+    }
 
     protected MechanicalMachine(MechanicalPower required, byte requiredDirection) {
         this.required = required;
