@@ -1,0 +1,6 @@
+{
+  "block.torque_foundry.generator": "Generator",
+  "block.torque_foundry.shaft": "Shaft",
+  "block.torque_foundry.consumer": "Consumer",
+  "itemGroup.torque_foundry.main": "Torque Foundry"
+}

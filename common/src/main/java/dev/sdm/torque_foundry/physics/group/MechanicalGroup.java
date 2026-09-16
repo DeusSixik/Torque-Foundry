@@ -58,11 +58,20 @@ public class MechanicalGroup {
         return machines;
     }
 
+    public int getSize() {
+        return size;
+    }
+
+    public boolean isEmpty() {
+        return size == 0;
+    }
+
     public int addElement(@NotNull MechanicalMachine machine) {
         ensureCapacity(size + 1);
         int newIndex = size++;
         machines[newIndex] = machine;
-        machine.setGroupIndex(newIndex);
+        machine.setGroupIndex(groupId);
+        machine.setGroupElementIndex(newIndex);
         return size;
     }
 
@@ -74,7 +83,8 @@ public class MechanicalGroup {
                 if (i < lastIndex) {
                     MechanicalMachine lastMachine = machines[lastIndex];
                     machines[i] = lastMachine;
-                    lastMachine.setGroupIndex(i);
+                    lastMachine.setGroupIndex(groupId);
+                    lastMachine.setGroupElementIndex(i);
                 }
 
                 machines[lastIndex] = null;
@@ -101,7 +111,8 @@ public class MechanicalGroup {
         this.size = totalNewSize;
 
         for (int i = startOffset; i < this.size; i++) {
-            this.machines[i].setGroupIndex(i);
+            this.machines[i].setGroupIndex(groupId);
+            this.machines[i].setGroupElementIndex(i);
         }
 
         Arrays.fill(otherGroup.machines, 0, otherGroup.size, null);
@@ -127,7 +138,7 @@ public class MechanicalGroup {
             System.arraycopy(this.machines, splitIndex + 1, newGroup.machines, 0, tailSize);
 
             for (int i = 0; i < tailSize; i++) {
-                newGroup.machines[i].setGroupIndex(i);
+                newGroup.machines[i].setGroupIndex(newGroup.groupId);
             }
         }
 

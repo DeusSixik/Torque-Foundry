@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.core.data;
+﻿package dev.sdm.torque_foundry.core.data;
 
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
@@ -13,11 +13,15 @@ public final class MechanicalGroupManager {
 
     private static final Long2ObjectMap<MechanicalGroup> GROUPS_BY_ID = new Long2ObjectOpenHashMap<>();
 
-    public static MechanicalGroup createOrAdd(LevelAccessor level, MechanicalBlockEntity entity) {
+    public static synchronized MechanicalGroup getGroup(long groupId) {
+        return GROUPS_BY_ID.get(groupId);
+    }
+
+    public static synchronized MechanicalGroup createOrAdd(LevelAccessor level, MechanicalBlockEntity entity) {
         final BlockPos.MutableBlockPos rootPos = entity.getBlockPos().mutable();
         final MechanicalMachine machine = entity.machine;
 
-        // Множество для уникальных ID групп соседей, к которым можно подключиться
+        // РњРЅРѕР¶РµСЃС‚РІРѕ РґР»СЏ СѓРЅРёРєР°Р»СЊРЅС‹С… ID РіСЂСѓРїРї СЃРѕСЃРµРґРµР№, Рє РєРѕС‚РѕСЂС‹Рј РјРѕР¶РЅРѕ РїРѕРґРєР»СЋС‡РёС‚СЊСЃСЏ
 //        final LongOpenHashSet connectedGroupIds = new LongOpenHashSet();
 
         long firstGroupId = -1;
@@ -25,11 +29,11 @@ public final class MechanicalGroupManager {
         for (Direction side : Direction.values()) {
             final BlockPos neighborPos = rootPos.move(side.getStepX(), side.getStepY(), side.getStepZ());
 
-            // Ищем BlockEntity соседа
+            // РС‰РµРј BlockEntity СЃРѕСЃРµРґР°
             if (level.getBlockEntity(neighborPos) instanceof MechanicalBlockEntity neighborEntity) {
                 final MechanicalMachine neighborMachine = neighborEntity.machine;
 
-                // Проверяем, могут ли две машины соединиться через грань 'side'
+                // РџСЂРѕРІРµСЂСЏРµРј, РјРѕРіСѓС‚ Р»Рё РґРІРµ РјР°С€РёРЅС‹ СЃРѕРµРґРёРЅРёС‚СЊСЃСЏ С‡РµСЂРµР· РіСЂР°РЅСЊ 'side'
                 if (canConnect(machine, neighborMachine, side)) {
                     final long neighborGroupId = neighborMachine.getGroupIndex();
                     if (neighborGroupId != -1) {
@@ -41,7 +45,9 @@ public final class MechanicalGroupManager {
         }
 
         if(firstGroupId == -1) {
-             return new MechanicalGroup(machine);
+            final MechanicalGroup group = new MechanicalGroup(machine);
+            GROUPS_BY_ID.put(group.getGroupId(), group);
+            return group;
         }
 
         final MechanicalGroup group = GROUPS_BY_ID.get(firstGroupId);
@@ -52,23 +58,27 @@ public final class MechanicalGroupManager {
         return group;
     }
 
-    public static boolean remove(MechanicalBlockEntity block) {
+    public static synchronized boolean remove(MechanicalBlockEntity block) {
         return remove(block.machine);
     }
 
-    public static boolean remove(MechanicalMachine machine) {
+    public static synchronized boolean remove(MechanicalMachine machine) {
         final long groupIndex = machine.getGroupIndex();
+        if (groupIndex == -1) {
+            return false;
+        }
+
         final MechanicalGroup group = GROUPS_BY_ID.get(groupIndex);
-        if(group == null)
-            throw new RuntimeException("Group with ID " + groupIndex + " not found");
+        if (group == null) {
+            return false;
+        }
 
         group.removeElement(machine);
         return remove(group);
     }
 
-    public static boolean remove(MechanicalGroup group) {
-        final MechanicalMachine[] machines = group.getMachines();
-        if(machines.length != 0) {
+    public static synchronized boolean remove(MechanicalGroup group) {
+        if (!group.isEmpty()) {
             return false;
         }
 
@@ -78,11 +88,11 @@ public final class MechanicalGroupManager {
 
 
     /**
-     * Проверяет механическую совместимость портов между текущей машиной и соседом.
+     * РџСЂРѕРІРµСЂСЏРµС‚ РјРµС…Р°РЅРёС‡РµСЃРєСѓСЋ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ РїРѕСЂС‚РѕРІ РјРµР¶РґСѓ С‚РµРєСѓС‰РµР№ РјР°С€РёРЅРѕР№ Рё СЃРѕСЃРµРґРѕРј.
      *
-     * @param self       наша машина
-     * @param neighbor   машина соседа
-     * @param toNeighbor направление от нас к соседу
+     * @param self       РЅР°С€Р° РјР°С€РёРЅР°
+     * @param neighbor   РјР°С€РёРЅР° СЃРѕСЃРµРґР°
+     * @param toNeighbor РЅР°РїСЂР°РІР»РµРЅРёРµ РѕС‚ РЅР°СЃ Рє СЃРѕСЃРµРґСѓ
      */
     private static boolean canConnect(MechanicalMachine self, MechanicalMachine neighbor, Direction toNeighbor) {
         Direction fromNeighborToSelf = toNeighbor.getOpposite();
@@ -90,7 +100,7 @@ public final class MechanicalGroupManager {
         boolean selfCanOutput = containsDirection(self.getOutputDirections(), toNeighbor);
         boolean neighborCanInput = containsDirection(neighbor.getInputDirections(), fromNeighborToSelf);
 
-        // Наш выход стыкуется со входом соседа
+        // РќР°С€ РІС‹С…РѕРґ СЃС‚С‹РєСѓРµС‚СЃСЏ СЃРѕ РІС…РѕРґРѕРј СЃРѕСЃРµРґР°
         if (selfCanOutput && neighborCanInput) {
             return true;
         }
@@ -98,7 +108,7 @@ public final class MechanicalGroupManager {
         boolean selfCanInput = containsDirection(self.getInputDirections(), toNeighbor);
         boolean neighborCanOutput = containsDirection(neighbor.getOutputDirections(), fromNeighborToSelf);
 
-        // Наш вход стыкуется с выходом соседа (или двунаправленная передача вал-вал)
+        // РќР°С€ РІС…РѕРґ СЃС‚С‹РєСѓРµС‚СЃСЏ СЃ РІС‹С…РѕРґРѕРј СЃРѕСЃРµРґР° (РёР»Рё РґРІСѓРЅР°РїСЂР°РІР»РµРЅРЅР°СЏ РїРµСЂРµРґР°С‡Р° РІР°Р»-РІР°Р»)
         return selfCanInput && neighborCanOutput;
     }
 

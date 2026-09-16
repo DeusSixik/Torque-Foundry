@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "torque_foundry:block/consumer" }
+  }
+}

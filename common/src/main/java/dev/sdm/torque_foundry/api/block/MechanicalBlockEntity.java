@@ -20,7 +20,11 @@ public class MechanicalBlockEntity extends BlockEntity {
         }
 
         final MechanicalPower power = block.power;
-        this.machine = MechanicalMachine.fromRaw(power.getSpeedRaw(),
+        this.machine = createMachine(power);
+    }
+
+    protected MechanicalMachine createMachine(MechanicalPower power) {
+        return MechanicalMachine.fromRaw(power.getSpeedRaw(),
                 power.getTorqueRaw(), RotationDirection.from(power.getDirection())
         );
     }

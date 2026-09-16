@@ -1,0 +1,6 @@
+{
+  "block.torque_foundry.generator": "Генератор",
+  "block.torque_foundry.shaft": "Вал",
+  "block.torque_foundry.consumer": "Потребитель",
+  "itemGroup.torque_foundry.main": "Torque Foundry"
+}
