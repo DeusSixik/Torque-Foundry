@@ -1,11 +1,21 @@
 package dev.sdm.torque_foundry.physics.basic;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Locale;
 
 import static dev.sdm.torque_foundry.physics.basic.MechanicalPowerConstants.PI2_60_DEN;
 import static dev.sdm.torque_foundry.physics.basic.MechanicalPowerConstants.PI2_60_NUM;
 
 public class MechanicalPower {
+
+    public static MechanicalPower from(MechanicalPower input) {
+        return new MechanicalPower(
+                input.speed,
+                input.torque,
+                input.direction
+        );
+    }
 
     public static MechanicalPower from(long speed, long torque) {
         return from(speed, torque, RotationDirection.FORWARD);
@@ -44,12 +54,22 @@ public class MechanicalPower {
      * Nm in milli-Nm = A / {@link MechanicalPowerConstants#SCALE}
      */
     protected long torque;
+
+    /**
+     * Rotation direction {@link RotationDirection}
+     */
     protected byte direction;
 
     protected MechanicalPower(long speed, long torque, byte direction) {
         this.speed = speed;
         this.torque = torque;
         this.direction = direction;
+    }
+
+    public void copyFrom(@NotNull MechanicalPower power) {
+        this.speed = power.speed;
+        this.torque = power.torque;
+        this.direction = power.direction;
     }
 
     public void setParams(long speed, long torque, RotationDirection direction) {
@@ -129,5 +149,25 @@ public class MechanicalPower {
                 getPowerWatts(),
                 RotationDirection.from(this.direction) // или this.direction, если нет вспомогательного метода
         );
+    }
+
+    public MechanicalPower plus(MechanicalPower power) {
+        return plus(power.speed, power.torque);
+    }
+
+    public MechanicalPower plus(long speed, long torque) {
+        this.speed += speed;
+        this.torque += torque;
+        return this;
+    }
+
+    public MechanicalPower minus(MechanicalPower power) {
+        return minus(power.speed, power.torque);
+    }
+
+    public MechanicalPower minus(long speed, long torque) {
+        this.speed -= speed;
+        this.torque -= torque;
+        return this;
     }
 }

@@ -1,21 +1,53 @@
 package dev.sdm.torque_foundry;
 
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalGearbox;
+import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 
 public class TorqueFoundryProgram {
 
     public static void main(String[] args) {
-        MechanicalPower power = MechanicalPower.from(256, 32);
 
-        System.out.println(power);
-        MechanicalGearbox gearbox = new MechanicalGearbox(2, true, false);
-        power = gearbox.transform(power);
-        System.out.println(power);
+        MechanicalGroup group = new MechanicalGroup();
+        group.setMachines(
+            MechanicalMachine.from(
+                    4, 16
+            ),
+            MechanicalMachine.from(
+                    8, 4
+            )
+        );
 
-        gearbox = new MechanicalGearbox(2, false, false);
-        power = gearbox.transform(power);
-        System.out.println(power);
+        iteration(group);
+    }
+
+    public static void iteration(MechanicalGroup group) {
+        var machines = group.getMachines();
+
+        MechanicalPower power = MechanicalPower.from(256, 64);
+        final long availableTorque = power.getTorqueRaw();
+        final long currentSpeed = power.getSpeedRaw();
+
+        int activeMachinesCount = 0;
+        MechanicalMachine[] activeMachines = new MechanicalMachine[machines.length];
+
+        long totalRequiredTorque = 0;
+        for (MechanicalMachine machine : machines) {
+            MechanicalPower required = machine.getRequired();
+
+            if(currentSpeed >= required.getSpeedRaw()) {
+                totalRequiredTorque += required.getTorqueRaw();
+                activeMachines[activeMachinesCount++] = machine;
+            }
+        }
+
+        if(availableTorque >= totalRequiredTorque) {
+            for (int i = 0; i < activeMachinesCount; i++) {
+                System.out.println(activeMachines[i]);
+            }
+        } else {
+            System.out.println("Not enough troque");
+        }
     }
 }
