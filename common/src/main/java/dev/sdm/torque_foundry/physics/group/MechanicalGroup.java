@@ -409,15 +409,27 @@ public class MechanicalGroup {
             // Требования детей снимаются с ВЫХОДА узла и переводятся на вход:
             // t_in = t_out * (s_out / s_in) — сохранение мощности через transform.
             // У узла с несколькими выходами (раздатка) у каждого ребра свой ratio.
+            // Если у ребёнка несколько родителей (слияние), его demand делится:
+            // от ребёнка требуется только то, что не покрывают его ДРУГИЕ родители.
             long demandIn = own;
             for (int e = 0; e < edgeCount; e++) {
                 if (edgeFrom[e] != m || inputPower[edgeTo[e]] == null) {
                     continue;
                 }
+                final int child = edgeTo[e];
+
+                // Подпитка ребёнка от других родителей (без нас)
+                long otherSupply = 0;
+                for (int p = 0; p < edgeCount; p++) {
+                    if (edgeTo[p] == child && edgeFrom[p] != m) {
+                        otherSupply += edgeTorque[p];
+                    }
+                }
+
                 final float ratio = in.getSpeedRaw() != 0
                         ? (float) edgeSpeed[e] / (float) in.getSpeedRaw()
                         : 1.0F;
-                demandIn += Math.round(subtreeTorque[edgeTo[e]] * ratio);
+                demandIn += Math.round(Math.max(0, subtreeTorque[child] - otherSupply) * ratio);
             }
 
             subtreeTorque[m] = demandIn;
@@ -474,8 +486,9 @@ public class MechanicalGroup {
             }
 
             if (machine.getOutput() != null) {
-                // Источник: перегружен, если дети требуют больше его мощности
-                states[m] = childrenWatts <= in.getPower()
+                // Источник: перегружен, если дети требуют больше его выдачи
+                // (subtreeTorque уже с вычетом подпитки других родителей)
+                states[m] = subtreeTorque[m] <= in.getTorqueRaw()
                         ? WorkState.WORKING : WorkState.INSUFFICIENT_POWER;
                 continue;
             }
@@ -493,11 +506,9 @@ public class MechanicalGroup {
                 continue;
             }
 
-            // Своя потребность + требования детей (через transform) против момента входа
-            final long own = required.getTorqueRaw();
-            final long demandIn = own + childrenWattsToTorque(childrenWatts, in.getSpeedRaw());
-
-            states[m] = demandIn <= in.getTorqueRaw() ? WorkState.WORKING : WorkState.INSUFFICIENT_POWER;
+            // Своя потребность + требования детей уже сведены к входной стороне
+            // в фазе B (с вычетом подпитки от других родителей при слиянии)
+            states[m] = subtreeTorque[m] <= in.getTorqueRaw() ? WorkState.WORKING : WorkState.INSUFFICIENT_POWER;
         }
 
         for (int i = 0; i < n; i++) {
