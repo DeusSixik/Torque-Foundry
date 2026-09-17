@@ -1,5 +1,10 @@
 {
   "variants": {
-    "": { "model": "torque_foundry:block/shaft" }
+    "axis=x,ceiling=false": { "model": "torque_foundry:block/shaft" },
+    "axis=x,ceiling=true": { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=false": { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=true": { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=false": { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=true": { "model": "torque_foundry:block/shaft" }
   }
 }

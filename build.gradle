@@ -25,6 +25,10 @@ allprojects {
         maven {
             url = 'https://maven.ryanhcode.dev/releases/'
         }
+        maven {
+            name = 'ParchmentMC'
+            url = 'https://maven.parchmentmc.org'
+        }
     }
 }
 
@@ -47,7 +51,11 @@ subprojects {
 
     dependencies {
         minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
-        mappings loom.officialMojangMappings()
+//        mappings loom.officialMojangMappings()
+        mappings loom.layered() {
+            officialMojangMappings()
+            parchment("org.parchmentmc.data:parchment-1.21.1:2024.11.17@zip")
+        }
 
         gautilsTool "com.github.Team-Argentum.GA-Utils:ga-utils-processor-struct:${ga_utils_version}"
         implementation "com.github.Team-Argentum.GA-Utils:ga-utils-api:${ga_utils_version}"

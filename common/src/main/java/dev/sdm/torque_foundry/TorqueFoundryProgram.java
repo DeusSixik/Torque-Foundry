@@ -1,13 +1,21 @@
 package dev.sdm.torque_foundry;
 
 
+import dev.sdm.torque_foundry.core.client.render.Model;
+import dev.sdm.torque_foundry.core.client.render.structs.Quad;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
+import net.minecraft.resources.ResourceLocation;
 
 public class TorqueFoundryProgram {
 
     public static void main(String[] args) {
+
+//        Model test = new Model(ResourceLocation.tryBuild("m", "a"),
+//                new Quad[]{
+//                    new Quad()
+//                });
 
         MechanicalGroup group = new MechanicalGroup();
         group.setMachines(

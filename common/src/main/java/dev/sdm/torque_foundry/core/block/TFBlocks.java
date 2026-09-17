@@ -31,7 +31,9 @@ public final class TFBlocks {
 
     public static final RegistrySupplier<ShaftBlock> SHAFT = BLOCKS.register(
             id("shaft"),
-            () -> new ShaftBlock(props())
+            // noOcclusion: блок рисуется BER'ом и не является полным кубом —
+            // соседние блоки должны рисовать свои грани, упирающиеся в него
+            () -> new ShaftBlock(props().noOcclusion())
     );
 
     public static final RegistrySupplier<ConsumerBlock> CONSUMER = BLOCKS.register(
