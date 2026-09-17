@@ -173,4 +173,6 @@ public class MechanicalGroup {
             this.machines = newArray;
         }
     }
+
+    public void computeTick() { }
 }

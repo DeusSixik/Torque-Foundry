@@ -1,5 +1,6 @@
 package dev.sdm.torque_foundry.core.network;
 
+import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -44,11 +45,16 @@ public final class ClientGroupCache {
             return;
         }
 
+        int applied = 0;
         for (GroupSyncPayload.Entry entry : payload.entries()) {
             applyMachine(level, entry, payload.groupId());
             POS_TO_DATA.put(entry.pos().asLong(), new long[]{payload.groupId(), entry.slot()});
+            applied++;
         }
         GROUPS.put(payload.groupId(), List.copyOf(payload.entries()));
+
+        TorqueFoundry.LOGGER.info("[TF-SYNC] applied: groupId={}, entries={}, beApplied={}",
+                payload.groupId(), payload.entries().size(), applied);
     }
 
     /**
@@ -79,7 +85,7 @@ public final class ClientGroupCache {
     }
 
     private static void applyMachine(Level level, GroupSyncPayload.Entry entry, long groupId) {
-        if (!(level.getBlockEntity(entry.pos()) instanceof MechanicalBlockEntity mechanical)) {
+        if (level == null || !(level.getBlockEntity(entry.pos()) instanceof MechanicalBlockEntity mechanical)) {
             return;
         }
         mechanical.machine.setGroupIndex(groupId);
@@ -87,7 +93,7 @@ public final class ClientGroupCache {
     }
 
     private static void clearMachine(Level level, BlockPos pos) {
-        if (!(level.getBlockEntity(pos) instanceof MechanicalBlockEntity mechanical)) {
+        if (level == null || !(level.getBlockEntity(pos) instanceof MechanicalBlockEntity mechanical)) {
             return;
         }
         mechanical.machine.setGroupIndex(-1);

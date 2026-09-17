@@ -2,6 +2,7 @@ package dev.sdm.torque_foundry.core.network;
 
 import dev.architectury.networking.NetworkManager;
 import dev.architectury.platform.Platform;
+import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
@@ -73,6 +74,9 @@ public final class TFNetworking {
                 targets.add(player);
             }
         }
+
+        TorqueFoundry.LOGGER.info("[TF-SYNC] send: groupId={}, members={}, entries={}, targets={}",
+                payload.groupId(), payload.memberCount(), payload.entries().size(), targets.size());
 
         if (!targets.isEmpty()) {
             NetworkManager.sendToPlayers(targets, payload);

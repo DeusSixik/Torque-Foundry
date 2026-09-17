@@ -1,10 +1,11 @@
 package dev.sdm.torque_foundry.core.network;
 
-import dev.sdm.torque_foundry.core.block.TFBlocks;
+import dev.sdm.torque_foundry.TorqueFoundry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +21,7 @@ public record GroupSyncPayload(long groupId, int memberCount, List<Entry> entrie
     }
 
     public static final CustomPacketPayload.Type<GroupSyncPayload> TYPE =
-            new CustomPacketPayload.Type<>(TFBlocks.id("mechanical_group_sync"));
+            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(TorqueFoundry.MOD_ID, "mechanical_group_sync"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, GroupSyncPayload> CODEC = StreamCodec.ofMember(
             GroupSyncPayload::encode, GroupSyncPayload::decode);

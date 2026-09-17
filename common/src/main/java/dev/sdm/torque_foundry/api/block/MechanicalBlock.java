@@ -60,6 +60,15 @@ public abstract class MechanicalBlock extends BaseEntityBlock {
                     TFNetworking.syncGroupRemoved((ServerLevel) level, groupId, blockPos);
                 } else if (group != null) {
                     TFNetworking.syncGroup((ServerLevel) level, group, blockPos);
+
+                    // Цепочка распалась — отправляем образовавшиеся группы
+                    for (MechanicalGroup newGroup : MechanicalGroupManager.drainNewGroups()) {
+                        TFNetworking.syncGroup((ServerLevel) level, newGroup, blockPos);
+                    }
+                }
+
+                for (long removedGroupId : MechanicalGroupManager.drainRemovedGroups()) {
+                    TFNetworking.syncGroupRemoved((ServerLevel) level, removedGroupId, blockPos);
                 }
             }
         }

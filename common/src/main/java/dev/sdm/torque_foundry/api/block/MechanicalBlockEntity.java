@@ -42,6 +42,14 @@ public class MechanicalBlockEntity extends BlockEntity {
         if (this.machine.getGroupIndex() == -1) {
             final MechanicalGroup group = MechanicalGroupManager.createOrAdd(this.level, this);
             TFNetworking.syncGroup((ServerLevel) this.level, group, this.worldPosition);
+
+            // Группы, влитые при этом соединении (или удалённые), убираем у клиентов
+            for (MechanicalGroup newGroup : MechanicalGroupManager.drainNewGroups()) {
+                TFNetworking.syncGroup((ServerLevel) this.level, newGroup, this.worldPosition);
+            }
+            for (long removedGroupId : MechanicalGroupManager.drainRemovedGroups()) {
+                TFNetworking.syncGroupRemoved((ServerLevel) this.level, removedGroupId, this.worldPosition);
+            }
         }
     }
 

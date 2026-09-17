@@ -14,6 +14,7 @@ import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import imgui.ImGui;
 import imgui.flag.ImGuiCond;
+import imgui.flag.ImGuiWindowFlags;
 import imgui.type.ImBoolean;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -59,10 +60,10 @@ public final class ClientOverlay {
 
         Minecraft minecraft = Minecraft.getInstance();
         ImGui.setNextWindowSize(620.0f, 720.0f, ImGuiCond.FirstUseEver);
-        ImGui.setNextWindowPos(40.0f, 40.0f, ImGuiCond.FirstUseEver);
+        ImGui.setNextWindowPos(4, 4, ImGuiCond.FirstUseEver);
 
         ImBoolean open = new ImBoolean(visible);
-        if (!ImGui.begin(TorqueFoundry.MOD_ID, open)) {
+        if (!ImGui.begin(TorqueFoundry.MOD_ID, open, ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize)) {
             ImGui.end();
             visible = open.get();
             return;
