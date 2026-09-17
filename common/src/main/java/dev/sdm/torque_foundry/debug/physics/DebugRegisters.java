@@ -4,7 +4,7 @@ import dev.architectury.event.events.client.ClientLifecycleEvent;
 import dev.architectury.registry.client.rendering.BlockEntityRendererRegistry;
 import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.core.block.TFBlockEntities;
-import dev.sdm.torque_foundry.core.client.render.ShaftRenderer;
+import dev.sdm.torque_foundry.core.client.models.ShaftRenderer;
 import foundry.imgui.api.ImGuiMCEvents;
 
 public final class DebugRegisters {

@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.core.machine;
+﻿package dev.sdm.torque_foundry.core.machine;
 
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
@@ -6,8 +6,8 @@ import dev.sdm.torque_foundry.physics.basic.RotationDirection;
 import net.minecraft.core.Direction;
 
 /**
- * Источник механической энергии: не имеет входов,
- * выдаёт мощность на все горизонтальные грани.
+ * РСЃС‚РѕС‡РЅРёРє РјРµС…Р°РЅРёС‡РµСЃРєРѕР№ СЌРЅРµСЂРіРёРё: РЅРµ РёРјРµРµС‚ РІС…РѕРґРѕРІ,
+ * РІС‹РґР°С‘С‚ РјРѕС‰РЅРѕСЃС‚СЊ РЅР° РІСЃРµ РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅС‹Рµ РіСЂР°РЅРё.
  */
 public class GeneratorMachine extends MechanicalMachine {
 
@@ -18,15 +18,17 @@ public class GeneratorMachine extends MechanicalMachine {
         this.output = MechanicalPower.fromRaw(outputSpeedRaw, outputTorqueRaw, direction);
     }
 
+    @Override
     public MechanicalPower getOutput() {
         return output;
     }
 
     @Override
     protected void createDirections() {
-        this.inputDirections = EMPTY_DIRECTIONS;
-        this.outputDirections = new Direction[]{
-                Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
-        };
+        port(Direction.NORTH, PortRole.OUTPUT);
+        port(Direction.SOUTH, PortRole.OUTPUT);
+        port(Direction.WEST, PortRole.OUTPUT);
+        port(Direction.EAST, PortRole.OUTPUT);
     }
 }
+

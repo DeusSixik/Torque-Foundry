@@ -1,10 +1,7 @@
 package dev.sdm.torque_foundry.physics.simulation;
 
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
-import it.unimi.dsi.fastutil.objects.ObjectCollection;
 
-import java.util.Collection;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
 
@@ -12,7 +9,8 @@ public class PhysicsTick {
 
     protected int groupsCount;
     protected PendingData[] data;
-    protected final AtomicBoolean done = new AtomicBoolean(false);
+    // изначально "работа выполнена", чтобы первый await() серверного тика не завис
+    protected final AtomicBoolean done = new AtomicBoolean(true);
 
     public final void initialize(MechanicalGroup[] groups) {
         this.groupsCount = groups.length;
@@ -23,10 +21,6 @@ public class PhysicsTick {
             updateData(groupsCount, groups);
 
         done.set(false);
-    }
-
-    public final void startTick(ExecutorService service) {
-
     }
 
     private void createNew(int groupsCount, MechanicalGroup[] groups) {
@@ -67,6 +61,23 @@ public class PhysicsTick {
 
     public void markDone() {
         this.done.set(true);
+    }
+
+    /**
+     * Вычисление физики всех групп слота. Выполняется в потоке физики.
+     */
+    public void compute() {
+        final PendingData[] data = this.data;
+        if (data == null) {
+            markDone();
+            return;
+        }
+
+        for (int i = 0; i < groupsCount; i++) {
+            data[i].group.computeTick();
+        }
+
+        markDone();
     }
 
     public static class Result {

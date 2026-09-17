@@ -26,6 +26,28 @@ public final class MechanicalGroupManager {
     private static final CustomLong2ObjectOpenHashMap<MechanicalMachine> MACHINES_BY_POS = new CustomLong2ObjectOpenHashMap<>();
     private static final LongList PENDING_REMOVED_GROUPS = new LongArrayList();
     private static final List<MechanicalGroup> PENDING_NEW_GROUPS = new ArrayList<>();
+    private static final LongList DIRTY_GROUPS = new LongArrayList();
+
+    /**
+     * Группа изменилась (состав/физика) — требует досылки снапшота клиентам.
+     */
+    public static synchronized void markDirty(long groupId) {
+        if (groupId != -1) {
+            DIRTY_GROUPS.add(groupId);
+        }
+    }
+
+    /**
+     * Id групп, изменённых с прошлого вызова. Синк клиентов — после физ. тика.
+     */
+    public static synchronized long[] drainDirtyGroups() {
+        if (DIRTY_GROUPS.isEmpty()) {
+            return new long[0];
+        }
+        final long[] ids = DIRTY_GROUPS.toLongArray();
+        DIRTY_GROUPS.clear();
+        return ids;
+    }
 
     public MechanicalGroupManager() { }
 
@@ -37,8 +59,13 @@ public final class MechanicalGroupManager {
         return GROUPS_BY_ID.values();
     }
 
+    /**
+     * Снапшот групп для физического тика (снимается под блокировкой).
+     * primitiveValues() — живой view мапы: без копии в массив итерация
+     * в потоке физики упадёт с CME при мутации с серверного треда.
+     */
     public static synchronized MechanicalGroup[] getGroupsPrimitive() {
-        return GROUPS_BY_ID.primitiveValues();
+        return GROUPS_BY_ID.values().toArray(new MechanicalGroup[0]);
     }
 
     /**
@@ -111,6 +138,7 @@ public final class MechanicalGroupManager {
             }
         }
 
+        markDirty(group.getGroupId());
         MACHINES_BY_POS.put(rootPos.asLong(), machine);
         return group;
     }
@@ -129,6 +157,9 @@ public final class MechanicalGroupManager {
         if (group == null) {
             return false;
         }
+
+        // Состав группы изменился — клиенту нужен свежий снапшот
+        markDirty(groupIndex);
 
         group.removeElement(machine);
 
@@ -266,7 +297,11 @@ public final class MechanicalGroupManager {
         }
     }
 
-    private static Direction directionBetween(MechanicalMachine from, MechanicalMachine to) {
+    /**
+     * Направление от машины A к машине B, если они смежны (по X/Y/Z),
+     * иначе null. Публично: используется физикой группы.
+     */
+    public static Direction directionBetween(MechanicalMachine from, MechanicalMachine to) {
         final BlockPos a = from.getBlockPos();
         final BlockPos b = to.getBlockPos();
         if (a == null || b == null) {
@@ -288,12 +323,14 @@ public final class MechanicalGroupManager {
 
     /**
      * Проверяет механическую совместимость портов между текущей машиной и соседом.
+     * Публично: используется также физикой группы (распространение энергии
+     * только по валидным output->input цепочкам).
      *
      * @param self       наша машина
      * @param neighbor   машина соседа
      * @param toNeighbor направление от нас к соседу
      */
-    private static boolean canConnect(MechanicalMachine self, MechanicalMachine neighbor, Direction toNeighbor) {
+    public static boolean canConnect(MechanicalMachine self, MechanicalMachine neighbor, Direction toNeighbor) {
         Direction fromNeighborToSelf = toNeighbor.getOpposite();
 
         boolean selfCanOutput = containsDirection(self.getOutputDirections(), toNeighbor);
@@ -309,6 +346,17 @@ public final class MechanicalGroupManager {
 
         // Наш вход стыкуется с выходом соседа (или двунаправленная передача вал-вал)
         return selfCanInput && neighborCanOutput;
+    }
+
+    /**
+     * Строгое направление ПЕРЕДАЧИ ЭНЕРГИИ: from обязан иметь выход в грань
+     * toNeighbor, to — принимать с обратной грани. В отличие от {@link #canConnect}
+     * (структурная стыковка, симметричная) — не позволяет потребителю
+     * "отдавать" энергию дальше: у потребителя выходов нет.
+     */
+    public static boolean canTransferPower(MechanicalMachine from, MechanicalMachine to, Direction fromTo) {
+        return containsDirection(from.getOutputDirections(), fromTo)
+                && containsDirection(to.getInputDirections(), fromTo.getOpposite());
     }
 
     private static boolean containsDirection(Direction[] directions, Direction target) {

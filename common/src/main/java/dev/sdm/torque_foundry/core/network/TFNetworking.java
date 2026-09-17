@@ -5,6 +5,7 @@ import dev.architectury.platform.Platform;
 import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.fabricmc.api.EnvType;
 import net.minecraft.core.BlockPos;
@@ -40,7 +41,47 @@ public final class TFNetworking {
      */
     public static void syncAllGroups(ServerPlayer player) {
         for (MechanicalGroup group : MechanicalGroupManager.getGroups()) {
-            NetworkManager.sendToPlayer(player, buildPayload(group));
+            if (!group.isEmpty()) {
+                NetworkManager.sendToPlayer(player, buildPayload(group));
+            }
+        }
+    }
+
+    /**
+     * Периодический полный синк: снапшоты всех групп всем игрокам.
+     * Пока для теста; позже — только ближайшие группы.
+     */
+    public static void syncAllGroupsToPlayers(List<ServerPlayer> players) {
+        for (MechanicalGroup group : MechanicalGroupManager.getGroups()) {
+            if (group.isEmpty()) {
+                continue;
+            }
+            NetworkManager.sendToPlayers(players, buildPayload(group));
+        }
+    }
+
+    /**
+     * Досылает снапшоты изменённых (грязных) групп и удаляет пропавшие.
+     * Вызывается ПОСЛЕ завершения физического тика — данные в машинах
+     * уже пересчитаны, клиент получает актуальную энергию.
+     *
+     * @param players    все игроки сервера (группы не привязаны к уровню)
+     * @param dirtyIds   id групп, чей состав/физика изменились
+     * @param removedIds id полностью удалённых групп
+     */
+    public static void syncDirtyGroups(List<ServerPlayer> players, long[] dirtyIds, long[] removedIds) {
+        for (long groupId : dirtyIds) {
+            final MechanicalGroup group = MechanicalGroupManager.getGroup(groupId);
+            if (group != null && !group.isEmpty()) {
+                NetworkManager.sendToPlayers(players, buildPayload(group));
+            } else {
+                // группа исчезла — клиент чистит её кэш
+                NetworkManager.sendToPlayers(players, new GroupSyncPayload(groupId, 0, List.of()));
+            }
+        }
+
+        for (long removedId : removedIds) {
+            NetworkManager.sendToPlayers(players, new GroupSyncPayload(removedId, 0, List.of()));
         }
     }
 
@@ -54,7 +95,15 @@ public final class TFNetworking {
             if (machine == null || machine.getBlockPos() == null) {
                 continue;
             }
-            entries.add(new GroupSyncPayload.Entry(machine.getBlockPos(), machine.getGroupElementIndex()));
+
+            final MechanicalPower received = machine.getReceived();
+            entries.add(new GroupSyncPayload.Entry(
+                    machine.getBlockPos(),
+                    machine.getGroupElementIndex(),
+                    machine.getWorkState().ordinal(),
+                    received.getSpeedRaw(),
+                    received.getTorqueRaw(),
+                    received.getDirection()));
         }
 
         return new GroupSyncPayload(group.getGroupId(), group.getSize(), entries);

@@ -1,26 +1,37 @@
-package dev.sdm.torque_foundry.core.machine;
+﻿package dev.sdm.torque_foundry.core.machine;
 
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
 import net.minecraft.core.Direction;
 
 /**
- * Пассивный передатчик: принимает и отдаёт вращение
- * со всех горизонтальных граней, ничего не потребляет.
+ * Пассивный передатчик: две осевые грани — одновременно INPUT и OUTPUT
+ * (IN_OUT), энергия проходит насквозь в направлении, которое задаёт
+ * положение источника. Перпендикулярные грани мощность не проводят.
  */
 public class ShaftMachine extends MechanicalMachine {
 
-    private static final Direction[] HORIZONTAL = {
-            Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
-    };
-
     public ShaftMachine() {
         super(MechanicalPower.fromRaw(0, 0), (byte) -1);
+        setPassive(true);
+        applyAxisPorts();
     }
 
     @Override
-    protected void createDirections() {
-        this.inputDirections = HORIZONTAL;
-        this.outputDirections = HORIZONTAL;
+    public void setAxis(Direction.Axis axis) {
+        super.setAxis(axis);
+        applyAxisPorts();
+    }
+
+    private void applyAxisPorts() {
+        // Мировые порты напрямую: ось берётся из blockstate блока,
+        // локальный поворот (facing) для вала не применяется
+        clearWorldPorts();
+        for (Direction dir : Direction.values()) {
+            if (dir.getAxis() == getAxis()) {
+                worldPort(dir, PortRole.IN_OUT);
+            }
+        }
     }
 }

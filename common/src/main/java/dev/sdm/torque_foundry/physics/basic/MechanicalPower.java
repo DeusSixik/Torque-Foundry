@@ -72,6 +72,15 @@ public class MechanicalPower {
         this.direction = power.direction;
     }
 
+    /**
+     * Обнуляет мощность без создания нового объекта (mutable-архитектура).
+     */
+    public void reset() {
+        this.speed = 0;
+        this.torque = 0;
+        this.direction = RotationDirection.FORWARD.index;
+    }
+
     public void setParams(long speed, long torque, RotationDirection direction) {
         this.setParams(speed, torque, direction.index);
     }

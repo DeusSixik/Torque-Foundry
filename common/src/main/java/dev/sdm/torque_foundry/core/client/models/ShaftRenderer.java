@@ -1,9 +1,11 @@
-package dev.sdm.torque_foundry.core.client.render;
+package dev.sdm.torque_foundry.core.client.models;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import dev.sdm.torque_foundry.core.block.ShaftBlock;
 import dev.sdm.torque_foundry.core.block.ShaftBlockEntity;
+import dev.sdm.torque_foundry.core.client.render.LODGenerator;
+import dev.sdm.torque_foundry.core.client.render.LODModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -93,10 +95,9 @@ public class ShaftRenderer implements BlockEntityRenderer<ShaftBlockEntity> {
         final double dz = pos.getZ() + 0.5 - camPos.z;
         final double distanceSqr = dx * dx + dy * dy + dz * dz;
 
-        // Тестовая анимация: угол от времени; позже angle придёт из MechanicalMachine
-        final long time = blockEntity.getLevel() != null
-                ? blockEntity.getLevel().getGameTime() : 0;
-        final float angle = (time % 20000L + partialTick) * Mth.DEG_TO_RAD * 4.0F;
+        // Угол из физики: накопленный угол BE + интерполяция частичного тика.
+        // Крутится только WORKING машина (см. getAngularVelocity).
+        final float angle = blockEntity.getRenderAngle(partialTick);
 
         final BlockState state = blockEntity.getBlockState();
         final Direction.Axis axis = state.hasProperty(BlockStateProperties.AXIS)

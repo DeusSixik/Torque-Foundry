@@ -12,12 +12,13 @@ import java.util.List;
 
 /**
  * Полный снапшот одной механической группы: id, число членов
- * и список позиций с индексами в группе. Пустой список членов
- * означает, что группа удалена.
+ * и список позиций с индексами в группе + результаты физического
+ * тика (состояние и полученная мощность) по каждой машине.
+ * Пустой список членов означает, что группа удалена.
  */
 public record GroupSyncPayload(long groupId, int memberCount, List<Entry> entries) implements CustomPacketPayload {
 
-    public record Entry(BlockPos pos, int slot) {
+    public record Entry(BlockPos pos, int slot, int state, long speedRaw, long torqueRaw, byte direction) {
     }
 
     public static final CustomPacketPayload.Type<GroupSyncPayload> TYPE =
@@ -33,6 +34,10 @@ public record GroupSyncPayload(long groupId, int memberCount, List<Entry> entrie
         for (Entry entry : payload.entries) {
             buf.writeBlockPos(entry.pos);
             buf.writeVarInt(entry.slot);
+            buf.writeVarInt(entry.state);
+            buf.writeVarLong(entry.speedRaw);
+            buf.writeVarLong(entry.torqueRaw);
+            buf.writeByte(entry.direction);
         }
     }
 
@@ -43,7 +48,13 @@ public record GroupSyncPayload(long groupId, int memberCount, List<Entry> entrie
 
         final List<Entry> entries = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            entries.add(new Entry(buf.readBlockPos(), buf.readVarInt()));
+            entries.add(new Entry(
+                    buf.readBlockPos(),
+                    buf.readVarInt(),
+                    buf.readVarInt(),
+                    buf.readVarLong(),
+                    buf.readVarLong(),
+                    buf.readByte()));
         }
         return new GroupSyncPayload(groupId, memberCount, entries);
     }

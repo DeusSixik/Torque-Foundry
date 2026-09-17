@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.core.machine;
+﻿package dev.sdm.torque_foundry.core.machine;
 
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
@@ -18,9 +18,10 @@ public class ConsumerMachine extends MechanicalMachine {
 
     @Override
     protected void createDirections() {
-        this.inputDirections = new Direction[]{
-                Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
-        };
-        this.outputDirections = EMPTY_DIRECTIONS;
+        port(Direction.NORTH, PortRole.INPUT);
+        port(Direction.SOUTH, PortRole.INPUT);
+        port(Direction.WEST, PortRole.INPUT);
+        port(Direction.EAST, PortRole.INPUT);
     }
 }
+

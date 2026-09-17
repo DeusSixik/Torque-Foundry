@@ -131,7 +131,11 @@ public final class ClientOverlay {
         ImGui.separator();
         ImGui.text("Machine");
 
+        ImGui.text("State: " + machine.getWorkState());
         ImGui.text("Required: " + formatPower(machine.getRequired()));
+        ImGui.text("Received: " + formatPower(machine.getReceived()));
+        ImGui.text("Net power: " + machine.getReceived().getPower() + " W");
+        ImGui.text("Leaf power: " + machine.getFreePower() + " W");
         ImGui.text("Inputs: " + formatDirections(machine.getInputDirections()));
         ImGui.text("Outputs: " + formatDirections(machine.getOutputDirections()));
 
