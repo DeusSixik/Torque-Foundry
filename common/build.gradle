@@ -11,4 +11,16 @@ dependencies {
     modImplementation "dev.architectury:architectury:$rootProject.architectury_api_version"
 
     compileOnly "foundry.imguimc:imguimc-common-${minecraft_version}:$imguimc_version"
+
+    // Unit tests for the physics simulation (pure JVM, no MC bootstrap)
+    testImplementation platform("org.junit:junit-bom:5.10.2")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "failed", "skipped"
+        showStandardStreams = true
+    }
 }

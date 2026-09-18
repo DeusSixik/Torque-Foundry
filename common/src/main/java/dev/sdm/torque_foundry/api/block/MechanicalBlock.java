@@ -28,6 +28,14 @@ public abstract class MechanicalBlock extends BaseEntityBlock {
         return power;
     }
 
+    /**
+     * Физический материал машины для этого blockstate (по умолчанию — железо).
+     * Переопределяется блоками со свойством MATERIAL (вал).
+     */
+    public dev.sdm.torque_foundry.physics.basic.MachineMaterial materialOf(BlockState state) {
+        return dev.sdm.torque_foundry.physics.basic.MachineMaterials.DEFAULT;
+    }
+
     @Override
     protected RenderShape getRenderShape(BlockState state) {
         return RenderShape.MODEL;

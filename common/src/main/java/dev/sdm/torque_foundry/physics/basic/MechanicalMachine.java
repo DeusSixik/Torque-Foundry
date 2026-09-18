@@ -87,8 +87,8 @@ public class MechanicalMachine {
     /**
      * Материал деталей машины: инерция (плотность), трение, безопасные обороты.
      */
-    private dev.sdm.torque_foundry.physics.basic.MachineMaterial material =
-            dev.sdm.torque_foundry.physics.basic.MachineMaterials.IRON;
+    private MachineMaterial material =
+            MachineMaterials.IRON;
 
     /**
      * Ориентация блока: в какую мировую сторону смотрит локальный NORTH.
@@ -240,29 +240,31 @@ public class MechanicalMachine {
         this.axis = axis;
     }
 
-    public dev.sdm.torque_foundry.physics.basic.MachineMaterial getMaterial() {
+    public MachineMaterial getMaterial() {
         return material;
     }
 
-    public void setMaterial(dev.sdm.torque_foundry.physics.basic.MachineMaterial material) {
+    public void setMaterial(MachineMaterial material) {
         this.material = material == null
-                ? dev.sdm.torque_foundry.physics.basic.MachineMaterials.DEFAULT : material;
+                ? MachineMaterials.DEFAULT : material;
     }
 
     /**
      * Приведённая инерция машины (вклад в разгон/торможение сети):
-     * плотность материала. В будущем — объём и размеры деталей.
+     * плотность материала, нормированная от стали. В будущем — объём и
+     * размеры деталей (реальный момент инерции).
      */
     public double getInertia() {
-        return material.density();
+        return material.relativeDensity();
     }
 
     /**
      * Момент трения машины при заданных оборотах (milli-Nm):
-     * трение пропорционально скорости.
+     * вязкое трение из реального коэффициента μ. Минимум 1 milli-Nm —
+     * чтобы сеть всегда останавливалась трением.
      */
     public long getFrictionTorque(long speedRaw) {
-        return Math.round(material.friction() * speedRaw);
+        return Math.max(1, Math.round(material.viscousFriction() * speedRaw));
     }
 
     public Direction getFacing() {

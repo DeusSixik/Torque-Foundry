@@ -42,11 +42,18 @@ public class ShaftBlock extends MechanicalBlock {
      */
     public static final BooleanProperty CEILING = BooleanProperty.create("ceiling");
 
+    /**
+     * Материал вала: безопасные обороты, инерция, трение.
+     * Переключается Shift+ПКМ (смотри useWithoutItem).
+     */
+    public static final EnumProperty<ShaftMaterial> MATERIAL = EnumProperty.create("material", ShaftMaterial.class);
+
     public ShaftBlock(Properties properties) {
         super(MechanicalPower.from(0, 0), properties);
         this.registerDefaultState(this.stateDefinition.any()
                 .setValue(AXIS, Direction.Axis.Y)
-                .setValue(CEILING, false));
+                .setValue(CEILING, false)
+                .setValue(MATERIAL, ShaftMaterial.IRON));
     }
 
     @Override
@@ -56,7 +63,7 @@ public class ShaftBlock extends MechanicalBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(AXIS, CEILING);
+        builder.add(AXIS, CEILING, MATERIAL);
     }
 
     /**
@@ -114,6 +121,11 @@ public class ShaftBlock extends MechanicalBlock {
     }
 
     @Override
+    public dev.sdm.torque_foundry.physics.basic.MachineMaterial materialOf(BlockState state) {
+        return state.getValue(MATERIAL).machine;
+    }
+
+    @Override
     public BlockEntity newBlockEntity(BlockPos blockPos, BlockState blockState) {
         return new ShaftBlockEntity(blockPos, blockState);
     }
@@ -129,6 +141,21 @@ public class ShaftBlock extends MechanicalBlock {
     @Override
     protected InteractionResult useWithoutItem(BlockState blockState, Level level, BlockPos blockPos, Player player, BlockHitResult blockHitResult) {
         final MechanicalBlockEntity be = (MechanicalBlockEntity) level.getBlockEntity(blockPos);
+
+        if (player.isSecondaryUseActive()) {
+            // Shift+ПКМ: следующий материал вала
+            if (!level.isClientSide) {
+                final ShaftMaterial next = blockState.getValue(MATERIAL).next();
+                level.setBlock(blockPos, blockState.setValue(MATERIAL, next), Block.UPDATE_ALL);
+                // BE не пересоздаётся при смене свойства — обновляем машину сами
+                if (be != null) {
+                    be.machine.setMaterial(next.machine);
+                }
+                player.displayClientMessage(Component.literal(
+                        "Shaft material: " + next.getSerializedName()), true);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
 
         player.displayClientMessage(Component.literal("" + be.machine.getGroupIndex()), false);
         return super.useWithoutItem(blockState, level, blockPos, player, blockHitResult);

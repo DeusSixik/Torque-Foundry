@@ -29,6 +29,7 @@ public class MechanicalBlockEntity extends BlockEntity {
         final MechanicalPower power = block.power;
         this.machine = createMachine(power);
         this.machine.setBlockPos(blockPos);
+        this.machine.setMaterial(block.materialOf(blockState));
         applyOrientation(this.machine, blockState);
     }
 

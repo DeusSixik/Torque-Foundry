@@ -7,7 +7,6 @@ import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 
 import java.util.ArrayList;
-import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 
 /**
  * Пример физического условия: износ валов на оборотах выше безопасного

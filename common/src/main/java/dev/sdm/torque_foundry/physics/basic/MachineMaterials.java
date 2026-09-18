@@ -2,17 +2,40 @@ package dev.sdm.torque_foundry.physics.basic;
 
 /**
  * Пресеты материалов механических деталей.
- * Дерево — дешёвое, лёгкое, тихое, но хрупкое и низкооборотное.
- * Сталь — тяжёлое, прочное, высокооборотное, с малым трением.
+ *
+ * <p>Физические константы задаются архетипами {@code Builder.wood()/bronze()/
+ * castIron()/steel()} (типовые справочные значения при 20 °C); зависимые
+ * величины (G, τ_y, σ₋₁) и прокси игровой динамики (инерция, трение,
+ * лимит оборотов) выводятся автоматически.
+ *
+ * <p>Дерево — дешёвое, лёгкое, тихое, но хрупкое и низкооборотное.
+ * Сталь — жёсткое, прочное, высокооборотное.
  */
 public final class MachineMaterials {
 
-    public static final MachineMaterial WOOD   = new MachineMaterial("Wood",   120, 0.010, 1.0, 2);
-    public static final MachineMaterial BRONZE = new MachineMaterial("Bronze", 180, 0.025, 1.5, 5);
-    public static final MachineMaterial IRON   = new MachineMaterial("Iron",   256, 0.030, 2.0, 8);
-    public static final MachineMaterial STEEL  = new MachineMaterial("Steel",  400, 0.020, 3.0, 12);
+    /**
+     * Дуб вдоль волокон: лёгкий, «мягкий», анизотропный (G кручения задан явно).
+     */
+    public static final MachineMaterial WOOD = MachineMaterial.Builder.wood("Wood").build();
 
-    /** Материал по умолчанию. */
+    /**
+     * Бронза: тяжёлая, пластичная, низкое трение по стали (подшипники).
+     */
+    public static final MachineMaterial BRONZE = MachineMaterial.Builder.bronze("Bronze").build();
+
+    /**
+     * Серый чугун: хрупкий, демпфирует вибрации.
+     */
+    public static final MachineMaterial IRON = MachineMaterial.Builder.castIron("Iron").build();
+
+    /**
+     * Конструкционная сталь: жёсткая, прочная, материал передач.
+     */
+    public static final MachineMaterial STEEL = MachineMaterial.Builder.steel("Steel").build();
+
+    /**
+     * Материал по умолчанию.
+     */
     public static final MachineMaterial DEFAULT = IRON;
 
     private MachineMaterials() {

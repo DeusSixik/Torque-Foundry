@@ -1,10 +1,28 @@
 {
   "variants": {
-    "axis=x,ceiling=false": { "model": "torque_foundry:block/shaft" },
-    "axis=x,ceiling=true": { "model": "torque_foundry:block/shaft" },
-    "axis=y,ceiling=false": { "model": "torque_foundry:block/shaft" },
-    "axis=y,ceiling=true": { "model": "torque_foundry:block/shaft" },
-    "axis=z,ceiling=false": { "model": "torque_foundry:block/shaft" },
-    "axis=z,ceiling=true": { "model": "torque_foundry:block/shaft" }
+    "axis=x,ceiling=false,material=wood":   { "model": "torque_foundry:block/shaft" },
+    "axis=x,ceiling=false,material=bronze": { "model": "torque_foundry:block/shaft" },
+    "axis=x,ceiling=false,material=iron":   { "model": "torque_foundry:block/shaft" },
+    "axis=x,ceiling=false,material=steel":  { "model": "torque_foundry:block/shaft" },
+    "axis=x,ceiling=true,material=wood":    { "model": "torque_foundry:block/shaft" },
+    "axis=x,ceiling=true,material=bronze":  { "model": "torque_foundry:block/shaft" },
+    "axis=x,ceiling=true,material=iron":    { "model": "torque_foundry:block/shaft" },
+    "axis=x,ceiling=true,material=steel":   { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=false,material=wood":   { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=false,material=bronze": { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=false,material=iron":   { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=false,material=steel":  { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=true,material=wood":    { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=true,material=bronze":  { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=true,material=iron":    { "model": "torque_foundry:block/shaft" },
+    "axis=y,ceiling=true,material=steel":   { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=false,material=wood":   { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=false,material=bronze": { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=false,material=iron":   { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=false,material=steel":  { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=true,material=wood":    { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=true,material=bronze":  { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=true,material=iron":    { "model": "torque_foundry:block/shaft" },
+    "axis=z,ceiling=true,material=steel":   { "model": "torque_foundry:block/shaft" }
   }
 }
