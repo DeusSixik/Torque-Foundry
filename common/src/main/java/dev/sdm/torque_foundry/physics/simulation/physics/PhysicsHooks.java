@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.physics.simulation;
+package dev.sdm.torque_foundry.physics.simulation.physics;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;

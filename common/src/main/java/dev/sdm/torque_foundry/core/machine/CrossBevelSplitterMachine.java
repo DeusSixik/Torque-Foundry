@@ -3,6 +3,7 @@ package dev.sdm.torque_foundry.core.machine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.basic.RotationDirection;
 import net.minecraft.core.Direction;
 
 /**
@@ -66,7 +67,7 @@ public class CrossBevelSplitterMachine extends MechanicalMachine {
                 final long outSpeedRaw = input.getSpeedRaw() * ti / to;
                 final long outTorqueRaw = input.getTorqueRaw() * to / ti;
                 final byte dir = output.reverses()
-                        ? dev.sdm.torque_foundry.physics.basic.RotationDirection.opposite(input.getDirection())
+                        ? RotationDirection.opposite(input.getDirection())
                         : input.getDirection();
 
                 return MechanicalPower.fromRaw(outSpeedRaw, outTorqueRaw, dir);

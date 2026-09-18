@@ -1,8 +1,8 @@
-package dev.sdm.torque_foundry.physics.simulation;
+package dev.sdm.torque_foundry.physics.simulation.physics;
 
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
+import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 
 /**
  * Пример физического условия: износ валов на высоких оборотах.

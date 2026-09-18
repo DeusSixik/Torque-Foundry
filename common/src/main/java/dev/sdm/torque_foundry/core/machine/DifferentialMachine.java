@@ -3,6 +3,7 @@
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.basic.RotationDirection;
 import net.minecraft.core.Direction;
 
 /**
@@ -47,7 +48,7 @@ public class DifferentialMachine extends MechanicalMachine {
             return MechanicalPower.fromRaw(
                     input.getSpeedRaw(),
                     input.getTorqueRaw(),
-                    dev.sdm.torque_foundry.physics.basic.RotationDirection.opposite(input.getDirection()));
+                    RotationDirection.opposite(input.getDirection()));
         }
         return input;
     }

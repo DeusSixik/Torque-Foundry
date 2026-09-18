@@ -3,6 +3,7 @@
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.basic.RotationDirection;
 import net.minecraft.core.Direction;
 
 /**
@@ -75,7 +76,7 @@ public class PlanetaryGearMachine extends MechanicalMachine {
                 ? Math.round(input.getTorqueRaw() / factor)
                 : input.getTorqueRaw();
         final byte dir = reverses
-                ? dev.sdm.torque_foundry.physics.basic.RotationDirection.opposite(input.getDirection())
+                ? RotationDirection.opposite(input.getDirection())
                 : input.getDirection();
 
         return MechanicalPower.fromRaw(outSpeedRaw, outTorqueRaw, dir);

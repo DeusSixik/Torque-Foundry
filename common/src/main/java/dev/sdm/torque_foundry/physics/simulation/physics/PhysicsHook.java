@@ -1,8 +1,9 @@
-package dev.sdm.torque_foundry.physics.simulation;
+package dev.sdm.torque_foundry.physics.simulation.physics;
 
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
+import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 
 /**
  * Хук внедрения физических условий в симуляцию группы.
