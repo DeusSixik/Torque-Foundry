@@ -5,6 +5,8 @@ import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 
+import java.util.List;
+
 /**
  * Хук внедрения физических условий в симуляцию группы.
  *
@@ -16,6 +18,8 @@ import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
  *   <li>{@link #onTransmit} — мощность идёт по ребру от машины к машине
  *       (потери на длине вала, центробежные потери, повреждения);</li>
  *   <li>{@link #onReceive} — машина получает мощность (до её transform);</li>
+ *   <li>{@link #onJam} — заклинивание цепочки (потребителю не хватило
+ *       момента, вся ветка до источников блокирована);</li>
  *   <li>{@link #onGroupTickEnd} — конец тика.</li>
  * </ol>
  * Все методы имеют default-реализацию — переопределяй только нужные.
@@ -36,6 +40,19 @@ public interface PhysicsHook {
 
     default MechanicalPower onReceive(MechanicalMachine machine, MechanicalPower power, SimulationContext context) {
         return power;
+    }
+
+    /**
+     * Заклинивание цепочки: потребителю не хватило момента, жёсткая сцепка
+     * блокирует всю цепь до производителей (двигатели глохнут под нагрузкой).
+     *
+     * @param group     группа, в которой произошло заклинивание
+     * @param jammed    все заклинившие машины (потребитель + цепь до источников)
+     * @param producers производители группы (точка внедрения поведения при клине)
+     * @param context   контекст тика
+     */
+    default void onJam(MechanicalGroup group, List<MechanicalMachine> jammed,
+                       List<MechanicalMachine> producers, SimulationContext context) {
     }
 
     default void onGroupTickEnd(MechanicalGroup group, SimulationContext context) {

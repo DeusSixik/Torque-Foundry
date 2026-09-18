@@ -14,6 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
@@ -46,6 +47,20 @@ public class MechanicalGroup {
 
     /** Счётчик физических тиков группы (для SimulationContext). */
     protected long simTick;
+
+    /**
+     * ТЕКУЩИЕ обороты сети (milli-RPM, на базовом уровне — уровне источников).
+     * Инерционная величина: раскручивается и выбегает плавно
+     * (см. PhysicsLibrary.tickSpeed). Все скорости ветвей — производные.
+     */
+    protected long currentSpeedRaw;
+
+    /**
+     * Текущие обороты сети в RPM (для UI/рендера).
+     */
+    public double getCurrentSpeedRpm() {
+        return currentSpeedRaw / 1000.0;
+    }
 
     // --- Scratch-буферы тика (mutable-архитектура: ноль аллокаций в тике) ---
     // Переиспользуются между тиками, растут при росте группы.
@@ -305,6 +320,8 @@ public class MechanicalGroup {
         queue.clear();
 
         // --- Фаза A: граф мощности (BFS от источников, слияние входов) ---
+        // Скорость источника = ТЕКУЩИЕ обороты сети (инерционная величина,
+        // без мгновенных скачков).
         for (int i = 0; i < n; i++) {
             MechanicalPower output = machines[i].getOutput();
             if (output == null) {
@@ -320,6 +337,7 @@ public class MechanicalGroup {
                 inputPower[i] = MechanicalPower.fromRaw(0, 0);
             }
             inputPower[i].copyFrom(output);
+            inputPower[i].setSpeedRaw(currentSpeedRaw);
             queue.add(i);
         }
 
@@ -384,7 +402,57 @@ public class MechanicalGroup {
             }
         }
 
+        // --- Фаза B: динамика оборотов сети (инерция/трение/нагрузка) ---
+        // Инерция и трение считаются по ВСЕМ машинам группы: железо физически
+        // присутствует независимо от того, доходит ли до него проводка.
+        // Скорости ветвей уже посчитаны BFS'ом от текущих оборотов сети.
+        long targetSpeedRaw = 0;
+        long sourceTorqueRaw = 0;
+        boolean hasSource = false;
+        double totalInertia = 0;
+        long frictionTorque = 0;
+        long loadTorque = 0;
+
+        for (int i = 0; i < n; i++) {
+            final MechanicalMachine machine = machines[i];
+            final MechanicalPower in = inputPower[i];
+
+            // Инерция и трение — по всем машинам группы
+            totalInertia += machine.getInertia();
+            frictionTorque += machine.getFrictionTorque(currentSpeedRaw);
+
+            if (in != null) {
+                final MechanicalPower output = machine.getOutput();
+                if (output != null) {
+                    hasSource = true;
+                    if (output.getSpeedRaw() > targetSpeedRaw) {
+                        targetSpeedRaw = output.getSpeedRaw();
+                    }
+                    sourceTorqueRaw += output.getTorqueRaw();
+                } else if (currentSpeedRaw >= machine.getRequired().getSpeedRaw()
+                        || machine.getWorkState() == WorkState.JAMMED) {
+                    // Потребитель, чьи обороты достаточны, нагружает сеть.
+                    // Заклинившая машина продолжает давить (статическое трение) —
+                    // клин не даёт цепи раскрутиться обратно.
+                    loadTorque += machine.getRequired().getTorqueRaw();
+                }
+            }
+        }
+
+        final long netTorque = (hasSource ? sourceTorqueRaw : 0) - frictionTorque - loadTorque;
+        final boolean boggingDown = hasSource && netTorque < 0;
+
+        if (boggingDown) {
+            // Перегрузка: потребитель требует больше, чем дают источники.
+            // Вал упирается и мгновенно клинит — без плавного выбега.
+            currentSpeedRaw = 0;
+        } else {
+            currentSpeedRaw = dev.sdm.torque_foundry.physics.PhysicsLibrary.tickSpeed(
+                    currentSpeedRaw, targetSpeedRaw, netTorque, (long) Math.max(1.0, totalInertia));
+        }
+
         // --- Фаза B: demand снизу вверх (по глубине, от листьев) ---
+        // Нужна для freePower/leaf power и для отображения нагрузки.
         for (int i = 0; i < n; i++) {
             order[i] = i;
         }
@@ -407,31 +475,14 @@ public class MechanicalGroup {
 
             // Требования детей снимаются с ВЫХОДА узла и переводятся на вход:
             // t_in = t_out * (s_out / s_in) — сохранение мощности через transform.
-            // У узла с несколькими выходами (раздатка) у каждого ребра свой ratio.
-            // Если у ребёнка несколько родителей (слияние), его demand делится:
-            // от ребёнка требуется только то, что не покрывают его ДРУГИЕ родители.
-            long demandIn = own;
+            long childrenOut = 0;
             for (int e = 0; e < edgeCount; e++) {
-                if (edgeFrom[e] != m || inputPower[edgeTo[e]] == null) {
-                    continue;
+                if (edgeFrom[e] == m && inputPower[edgeTo[e]] != null) {
+                    childrenOut += subtreeTorque[edgeTo[e]];
                 }
-                final int child = edgeTo[e];
-
-                // Подпитка ребёнка от других родителей (без нас)
-                long otherSupply = 0;
-                for (int p = 0; p < edgeCount; p++) {
-                    if (edgeTo[p] == child && edgeFrom[p] != m) {
-                        otherSupply += edgeTorque[p];
-                    }
-                }
-
-                final float ratio = in.getSpeedRaw() != 0
-                        ? (float) edgeSpeed[e] / (float) in.getSpeedRaw()
-                        : 1.0F;
-                demandIn += Math.round(Math.max(0, subtreeTorque[child] - otherSupply) * ratio);
             }
 
-            subtreeTorque[m] = demandIn;
+            subtreeTorque[m] = own + childrenOut;
         }
 
         // --- Фаза C: состояния сверху вниз (по глубине, от корней) ---
@@ -446,14 +497,29 @@ public class MechanicalGroup {
             final MechanicalPower in = inputPower[m];
 
             if (in == null) {
-                // Недостижима от источников: порты не стыкуются ни по одному пути
-                states[m] = WorkState.IDLE;
-                machine.getReceived().reset();
+                // Недостижима от источников, но если сеть ещё крутится —
+                // машина выбегает по инерции (WORKING), а не мгновенно стоит
+                if (currentSpeedRaw > 0) {
+                    states[m] = WorkState.WORKING;
+                    machine.getReceived().reset();
+                    machine.getReceived().setSpeedRaw(currentSpeedRaw);
+                } else {
+                    states[m] = WorkState.IDLE;
+                    machine.getReceived().reset();
+                }
                 machine.setFreePower(0);
                 continue;
             }
 
             machine.setReceived(in);
+
+            // Перегрузка сети: потребитель требует больше, чем дают источники.
+            // Все машины-потребители INSUFFICIENT_POWER → фаза D заклинит цепь.
+            if (boggingDown && machine.getOutput() == null) {
+                states[m] = WorkState.INSUFFICIENT_POWER;
+                machine.setFreePower(0);
+                continue;
+            }
 
             // Leaf power: received минус требования детей (перевод в ватты
             // по скорости каждого ребра — у раздатки они разные)
@@ -466,6 +532,9 @@ public class MechanicalGroup {
                 }
             }
             machine.setFreePower(Math.max(0, in.getPower() - childrenWatts));
+
+            // Балансовый хук (маховик и др. буферы)
+            machine.onNetworkTick(in.getPower(), childrenWatts);
 
             // Ветвь выше мертва (все родители без питания) => здесь тоже нет питания
             boolean hasParent = false;
@@ -506,8 +575,73 @@ public class MechanicalGroup {
             }
 
             // Своя потребность + требования детей уже сведены к входной стороне
-            // в фазе B (с вычетом подпитки от других родителей при слиянии)
-            states[m] = subtreeTorque[m] <= in.getTorqueRaw() ? WorkState.WORKING : WorkState.INSUFFICIENT_POWER;
+            // в фазе B (с вычетом подпитки от других родителей при слиянии).
+            // Машина-буфер (маховик) покрывает дефицит из запаса — работает,
+            // пока резерв есть.
+            // Пассивные сегменты (валы) жёстко сцеплены с сетью и вращаются
+            // вместе с ней: перегрузка потребителя не "останавливает" сегмент
+            // передачи — фейлится только машина с собственной потребностью.
+            if (subtreeTorque[m] <= in.getTorqueRaw()
+                    || (machine.coversDeficitFromBuffer() && machine.hasBufferReserve())
+                    || machine.isPassive()) {
+                states[m] = WorkState.WORKING;
+            } else {
+                states[m] = WorkState.INSUFFICIENT_POWER;
+            }
+        }
+
+        // --- Фаза D: заклинивание (жёсткая сцепка) ---
+        // Потребителю не хватило момента -> он блокируется и тащит за собой
+        // ВСЮ цепь вверх до источников: валы, промежуточные машины и
+        // производители глохнут под нагрузкой.
+        final boolean[] jammed = new boolean[n];
+        final List<MechanicalMachine> jammedMachines = new ArrayList<>();
+        final List<MechanicalMachine> jammedProducers = new ArrayList<>();
+
+        for (int i = 0; i < n; i++) {
+            if (inputPower[i] != null && states[i] == WorkState.INSUFFICIENT_POWER) {
+                jammed[i] = true;
+                states[i] = WorkState.JAMMED;
+                jammedMachines.add(machines[i]);
+            }
+        }
+
+        // Распространение вверх (order = depth asc, идём с конца: дети раньше
+        // родителей): заклинивший узел блокирует всех своих родителей.
+        for (int idx = n - 1; idx >= 0; idx--) {
+            final int c = order[idx];
+            if (!jammed[c]) {
+                continue;
+            }
+
+            for (int e = 0; e < edgeCount; e++) {
+                if (edgeTo[e] != c || inputPower[edgeFrom[e]] == null) {
+                    continue;
+                }
+                final int p = edgeFrom[e];
+                if (!jammed[p]) {
+                    jammed[p] = true;
+                    states[p] = WorkState.JAMMED;
+                    jammedMachines.add(machines[p]);
+                }
+            }
+        }
+
+        // Производители заклинившей сети (для хуков: реакция на клин)
+        if (!jammedMachines.isEmpty()) {
+            for (int i = 0; i < n; i++) {
+                if (inputPower[i] != null && machines[i].getOutput() != null) {
+                    jammedProducers.add(machines[i]);
+                }
+            }
+
+            // Жёсткая сцепка: клин мгновенно останавливает ВСЮ сеть,
+            // включая источник (двигатель глохнет под нагрузкой)
+            currentSpeedRaw = 0;
+
+            for (int h = 0; h < hooks.size(); h++) {
+                hooks.get(h).onJam(this, jammedMachines, jammedProducers, simContext);
+            }
         }
 
         for (int i = 0; i < n; i++) {

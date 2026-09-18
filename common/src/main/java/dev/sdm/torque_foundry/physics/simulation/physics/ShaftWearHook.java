@@ -2,24 +2,27 @@ package dev.sdm.torque_foundry.physics.simulation.physics;
 
 import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.basic.MechanicalPowerConstants;
+import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
+import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
+
+import java.util.ArrayList;
 import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 
 /**
- * Пример физического условия: износ валов на высоких оборотах.
- * Вал, крутящийся выше безопасного лимита, "люфтит" и теряет КПД:
- * каждый тик передачи через вал отнимает фиксированную долю МОМЕНТА
- * (растущую с превышением лимита). Обороты сети при этом не проседают —
- * в жёсткой модели они едины, потери выражаются в моменте (КПД).
+ * Пример физического условия: износ валов на оборотах выше безопасного
+ * лимита МАТЕРИАЛА (см. MachineMaterial.maxSafeSpeedRpm).
+ *
+ * Железный вал (256 RPM) на 256 RPM не изнашивается вовсе; на 400 RPM
+ * (стальной лимит) теряет момент за каждый проход. Деревянный вал
+ * (лимит 120 RPM) на 256 RPM теряет очень быстро.
  *
  * Mutable-архитектура: хук МОДИФИЦИРУЕТ переданный MechanicalPower
  * и возвращает его же — новых объектов на тик не создаётся.
  */
 public final class ShaftWearHook implements PhysicsHook {
 
-    /** Безопасные обороты вала (milli-RPM). */
-    private static final long SAFE_SPEED_RAW = 8_000;
-
-    /** Доля потери момента за ребро за тик на единицу превышения. */
+    /** Доля потери момента за ребро на единицу превышения (excess/safe). */
     private static final double WEAR_FACTOR = 0.01;
 
     @Override
@@ -28,13 +31,15 @@ public final class ShaftWearHook implements PhysicsHook {
             return power;
         }
 
+        // Лимит материала в RPM -> milli-RPM (юниты скорости сети)
+        final long safe = from.getMaterial().maxSafeSpeedRpm() * MechanicalPowerConstants.SCALE;
         final long speed = power.getSpeedRaw();
-        if (speed <= SAFE_SPEED_RAW) {
+        if (speed <= safe) {
             return power;
         }
 
-        final long excess = speed - SAFE_SPEED_RAW;
-        final long loss = Math.round(power.getTorqueRaw() * (excess / (double) SAFE_SPEED_RAW) * WEAR_FACTOR);
+        final long excess = speed - safe;
+        final long loss = Math.round(power.getTorqueRaw() * (excess / (double) safe) * WEAR_FACTOR);
         if (loss <= 0) {
             return power;
         }

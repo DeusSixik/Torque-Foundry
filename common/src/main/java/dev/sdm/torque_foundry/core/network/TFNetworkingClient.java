@@ -9,8 +9,8 @@ public final class TFNetworkingClient {
     public static void register() {
         NetworkManager.registerReceiver(NetworkManager.Side.S2C, GroupSyncPayload.TYPE, GroupSyncPayload.CODEC,
                 (payload, context) -> context.queue(() -> {
-                    TorqueFoundry.LOGGER.info("[TF-SYNC] received: groupId={}, members={}, entries={}",
-                            payload.groupId(), payload.memberCount(), payload.entries().size());
+//                    TorqueFoundry.LOGGER.info("[TF-SYNC] received: groupId={}, members={}, entries={}",
+//                            payload.groupId(), payload.memberCount(), payload.entries().size());
                     ClientGroupCache.apply(Minecraft.getInstance().level, payload);
                 }));
     }

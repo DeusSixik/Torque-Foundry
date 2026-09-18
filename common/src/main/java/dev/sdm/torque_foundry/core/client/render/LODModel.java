@@ -89,12 +89,16 @@ public class LODModel {
         public final float pivotY;
         public final float pivotZ;
 
-        /** Сдвиг узла относительно pivot (в пикселях модели, 1/16 блока). */
+        /**
+         * Сдвиг узла относительно pivot (в пикселях модели, 1/16 блока).
+         */
         public float offsetX;
         public float offsetY;
         public float offsetZ;
 
-        /** Поворот узла вокруг pivot (радианы). */
+        /**
+         * Поворот узла вокруг pivot (радианы).
+         */
         public float rotX;
         public float rotY;
         public float rotZ;
@@ -117,7 +121,8 @@ public class LODModel {
 
         private double cachedDistanceSqr = -1;
 
-        record LODLevel(LODBox[] boxes, double thresholdSqr) {}
+        record LODLevel(LODBox[] boxes, double thresholdSqr) {
+        }
 
         public Part(String name, float pivotX, float pivotY, float pivotZ) {
             this.name = name;
@@ -242,7 +247,8 @@ public class LODModel {
             if (rotY != 0) poseStack.mulPose(Axis.YP.rotation(rotY));
             if (rotX != 0) poseStack.mulPose(Axis.XP.rotation(rotX));
             poseStack.translate(-pivotX, -pivotY, -pivotZ);
-        }    }
+        }
+    }
 
     /**
      * Бокс модели: 6 граней, UV по таблице текстуры (ванильный layout).
@@ -321,19 +327,19 @@ public class LODModel {
             // Ванильная раскладка UV бокса (нормализованная)
             final float s = 1.0F / texW, t = 1.0F / texH;
             // down: (u+d, v) w x d
-            final float uD0 = (u + d) * s,         vD0 = v * t;
-            final float uD1 = (u + d + w) * s,     vD1 = (v + d) * t;
+            final float uD0 = (u + d) * s, vD0 = v * t;
+            final float uD1 = (u + d + w) * s, vD1 = (v + d) * t;
             // up: (u+d+w, v) w x d
-            final float uU0 = (u + d + w) * s,     vU0 = v * t;
+            final float uU0 = (u + d + w) * s, vU0 = v * t;
             final float uU1 = (u + d + w + w) * s, vU1 = (v + d) * t;
             // west: (u, v+d) d x h
-            final float uW0 = u * s,               vW0 = (v + d) * t;
-            final float uW1 = (u + d) * s,         vW1 = (v + d + h) * t;
+            final float uW0 = u * s, vW0 = (v + d) * t;
+            final float uW1 = (u + d) * s, vW1 = (v + d + h) * t;
             // north: (u+d, v+d) w x h
-            final float uN0 = (u + d) * s,         vN0 = (v + d) * t;
-            final float uN1 = (u + d + w) * s,     vN1 = (v + d + h) * t;
+            final float uN0 = (u + d) * s, vN0 = (v + d) * t;
+            final float uN1 = (u + d + w) * s, vN1 = (v + d + h) * t;
             // east: (u+d+w, v+d) d x h
-            final float uE0 = (u + d + w) * s,     vE0 = (v + d) * t;
+            final float uE0 = (u + d + w) * s, vE0 = (v + d) * t;
             final float uE1 = (u + d + w + d) * s, vE1 = (v + d + h) * t;
             // south: (u+d+w+d, v+d) w x h
             final float uS0 = (u + d + w + d) * s, vS0 = (v + d) * t;
@@ -385,6 +391,7 @@ public class LODModel {
 
             return quads;
         }
+
         private static Vertex vert(float x, float y, float z, float nx, float ny, float nz, float u, float v) {
             final Vertex vtx = new Vertex();
             vtx.x = x;

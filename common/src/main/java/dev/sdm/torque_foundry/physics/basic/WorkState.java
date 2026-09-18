@@ -4,5 +4,6 @@ public enum WorkState {
     WORKING,
     IDLE,
     WRONG_DIRECTION,
-    INSUFFICIENT_POWER;
+    INSUFFICIENT_POWER,
+    JAMMED
 }

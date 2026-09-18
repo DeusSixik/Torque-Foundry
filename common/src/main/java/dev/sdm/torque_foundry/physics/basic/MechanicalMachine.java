@@ -85,6 +85,12 @@ public class MechanicalMachine {
     protected Direction.Axis axis = Direction.Axis.X;
 
     /**
+     * Материал деталей машины: инерция (плотность), трение, безопасные обороты.
+     */
+    private dev.sdm.torque_foundry.physics.basic.MachineMaterial material =
+            dev.sdm.torque_foundry.physics.basic.MachineMaterials.IRON;
+
+    /**
      * Ориентация блока: в какую мировую сторону смотрит локальный NORTH.
      * Порты, заданные в локальных координатах, поворачиваются вместе с ней.
      */
@@ -184,10 +190,19 @@ public class MechanicalMachine {
      * конические поворачивают ось и т.д. По умолчанию — passthrough.
      *
      * @param input      мощность на входе машины
-     * @param outputSide мировая грань, через которую мощность покидает машину
+     * @param outputSide грань, через которую мощность покидает машину
      */
     public MechanicalPower transform(MechanicalPower input, Direction outputSide) {
         return input;
+    }
+
+    /**
+     * Балансовый хук конца физического тика:Received — что пришло в узел,
+     * childrenWatts — что суммарно требуют дети (в ваттах).
+     * Энергобуферы (маховик) здесь заряжаются от излишка и покрывают дефицит.
+     * Вызывается в потоке физики.
+     */
+    public void onNetworkTick(long receivedWatts, long childrenWatts) {
     }
 
     public boolean isPassive() {
@@ -196,6 +211,21 @@ public class MechanicalMachine {
 
     protected void setPassive(boolean passive) {
         this.passive = passive;
+    }
+
+    /**
+     * Машина-буфер (маховик): покрывает пиковый дефицит момента из своего
+     * запаса — перегрузка не передаётся вверх по сети, пока есть резерв.
+     */
+    public boolean coversDeficitFromBuffer() {
+        return false;
+    }
+
+    /**
+     * Есть ли сейчас резерв буфера (для машин с coversDeficitFromBuffer).
+     */
+    public boolean hasBufferReserve() {
+        return false;
     }
 
     public Direction.Axis getAxis() {
@@ -208,6 +238,31 @@ public class MechanicalMachine {
      */
     public void setAxis(Direction.Axis axis) {
         this.axis = axis;
+    }
+
+    public dev.sdm.torque_foundry.physics.basic.MachineMaterial getMaterial() {
+        return material;
+    }
+
+    public void setMaterial(dev.sdm.torque_foundry.physics.basic.MachineMaterial material) {
+        this.material = material == null
+                ? dev.sdm.torque_foundry.physics.basic.MachineMaterials.DEFAULT : material;
+    }
+
+    /**
+     * Приведённая инерция машины (вклад в разгон/торможение сети):
+     * плотность материала. В будущем — объём и размеры деталей.
+     */
+    public double getInertia() {
+        return material.density();
+    }
+
+    /**
+     * Момент трения машины при заданных оборотах (milli-Nm):
+     * трение пропорционально скорости.
+     */
+    public long getFrictionTorque(long speedRaw) {
+        return Math.round(material.friction() * speedRaw);
     }
 
     public Direction getFacing() {
