@@ -28,11 +28,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * Группа машин = жёстко сцепленная сеть. Физика считается как DAG передачи
  * мощности: от источников (Output) по направленным рёбрам output->input
  * к потребителям (Input), где каждый узел может ТРАНСФОРМИРОВАТЬ мощность.
- *
+ * <p>
  * Сеть инерционная: обороты сети (currentSpeedRaw) — интеграл момента
  * (разгон/торможение через PhysicsLibrary.tickSpeed). Материал деталей
  * задаёт трение и инерцию. Перегрузка сети клинит всю цепь (фаза D).
- *
+ * <p>
  * Точки расширения физических условий — хуки {@link PhysicsHook}
  * (износ валов, потеря мощности двигателя, температура и т.д.),
  * регистрируются в {@link PhysicsHooks}.
@@ -45,7 +45,9 @@ public class MechanicalGroup {
     protected MechanicalMachine[] machines;
     protected int size;
 
-    /** Счётчик физических тиков группы (для SimulationContext). */
+    /**
+     * Счётчик физических тиков группы (для SimulationContext).
+     */
     protected long simTick;
 
     /**
@@ -127,7 +129,8 @@ public class MechanicalGroup {
     }
 
     private void generateIndex() {
-        this.groupId = INDEX_GENERATOR.getAndIncrement();;
+        this.groupId = INDEX_GENERATOR.getAndIncrement();
+        ;
     }
 
     public long getGroupId() {
@@ -260,19 +263,19 @@ public class MechanicalGroup {
 
     /**
      * Физический тик группы: древовидная симуляция передачи кинетической энергии.
-     *
+     * <p>
      * Фаза A — граф мощности: BFS от источников по направленным рёбрам
-     *           output->input. Скорости ветвей считаются от ТЕКУЩИХ оборотов
-     *           сети (инерция: без мгновенных скачков).
+     * output->input. Скорости ветвей считаются от ТЕКУЩИХ оборотов
+     * сети (инерция: без мгновенных скачков).
      * Фаза B — динамика: обороты сети = интеграл момента
-     *           (PhysicsLibrary.tickSpeed): тяга источников против трения
-     *           и нагрузки потребителей.
+     * (PhysicsLibrary.tickSpeed): тяга источников против трения
+     * и нагрузки потребителей.
      * Фаза B2 — demand снизу вверх: момент поддерева каждого узла.
      * Фаза C — состояния сверху вниз: перегруженная сеть — INSUFFICIENT_POWER
-     *           у потребителей, валы жёстко крутятся вместе с сетью.
+     * у потребителей, валы жёстко крутятся вместе с сетью.
      * Фаза D — заклинивание: ветка без питания блокирует цепь до источников
-     *           (JAMMED), хук onJam находит производителей.
-     *
+     * (JAMMED), хук onJam находит производителей.
+     * <p>
      * Выполняется в потоке физики (см. PhysicsPipeline), не на серверном треде.
      */
     public void computeTick() {
@@ -484,7 +487,7 @@ public class MechanicalGroup {
             final long own = boggingDown
                     ? required.getTorqueRaw()
                     : (in.getSpeedRaw() >= required.getSpeedRaw()
-                            ? required.getTorqueRaw() : 0);
+                    ? required.getTorqueRaw() : 0);
 
             // Требования детей снимаются с ВЫХОДА узла и переводятся на вход:
             // t_in = t_out * (s_out / s_in) — сохранение мощности через transform.
