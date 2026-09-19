@@ -41,4 +41,10 @@ public class BeltDriveMachine extends MechanicalMachine {
 
         return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, input.getDirection());
     }
+
+    /** КПД передачи (игровое значение класса). */
+    @Override
+    public double getEfficiency() {
+        return 0.92;
+    }
 }

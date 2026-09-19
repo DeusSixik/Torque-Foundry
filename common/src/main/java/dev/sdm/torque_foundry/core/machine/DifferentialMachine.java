@@ -52,4 +52,10 @@ public class DifferentialMachine extends MechanicalMachine {
         }
         return input;
     }
+
+    /** КПД передачи (игровое значение класса). */
+    @Override
+    public double getEfficiency() {
+        return 0.97;
+    }
 }

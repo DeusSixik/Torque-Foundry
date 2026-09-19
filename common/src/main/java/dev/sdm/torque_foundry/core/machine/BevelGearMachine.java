@@ -47,4 +47,10 @@ public class BevelGearMachine extends MechanicalMachine {
 
         return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, dir);
     }
+
+    /** КПД конической передачи (~4% потерь). */
+    @Override
+    public double getEfficiency() {
+        return 0.96;
+    }
 }

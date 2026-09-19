@@ -23,5 +23,11 @@ public class ConsumerMachine extends MechanicalMachine {
         port(Direction.WEST, PortRole.INPUT);
         port(Direction.EAST, PortRole.INPUT);
     }
+
+    /** Потребителю нужен момент страгивания = его рабочей потребности. */
+    @Override
+    public long getBreakawayTorqueRaw() {
+        return getRequired().getTorqueRaw();
+    }
 }
 

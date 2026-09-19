@@ -11,8 +11,6 @@ import net.minecraft.core.Direction;
  */
 public class WormGearMachine extends MechanicalMachine {
 
-    private static final double EFFICIENCY = 0.8; // КПД червячной пары
-
     private final int ratio;
     private final Direction outputSide;
 
@@ -35,10 +33,16 @@ public class WormGearMachine extends MechanicalMachine {
             return input;
         }
 
+        // Потери КПД учитывает applyEfficiency (getEfficiency) — без дубля
         final long outSpeedRaw = input.getSpeedRaw() / ratio;
-        final long outTorqueRaw = Math.round(
-                input.getTorqueRaw() * ratio * EFFICIENCY);
+        final long outTorqueRaw = input.getTorqueRaw() * ratio;
 
         return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, input.getDirection());
+    }
+
+    /** КПД передачи (игровое значение класса). */
+    @Override
+    public double getEfficiency() {
+        return 0.75;
     }
 }

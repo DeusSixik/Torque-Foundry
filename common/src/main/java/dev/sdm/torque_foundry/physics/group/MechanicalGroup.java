@@ -83,10 +83,20 @@ public class MechanicalGroup {
     private long[] edgeSpeedBuf = new long[0];
     private long[] edgeTorqueBuf = new long[0];
     private boolean[] jammedBuf = new boolean[0];
+    private boolean[] conflictBuf = new boolean[0];
     private final Long2IntMap posToIndexBuf = new Long2IntOpenHashMap();
     private final SimulationContext simContext = new SimulationContext(this, 0);
     private final Queue<Integer> queueBuf = new ArrayDeque<>();
     private final RotationalPower edgeScratch = RotationalPower.fromRaw(0, 0);
+
+    /**
+     * Гистерезис конфликта направлений: клин только при УСТОЙЧИВОМ конфликте —
+     * N тиков подряд. Одиночный/мигающий конфликт не клинит (лекарство от
+     * дребезга клин<->не-клин при net≈0, тот же класс, что в маргинальном
+     * дефиците).
+     */
+    private int directionConflictTicks = 0;
+    private static final int DIRECTION_JAM_TICKS = 20;
 
     private static int[] ensureInt(int[] buffer, int size) {
         return buffer.length >= size ? buffer : new int[size];
@@ -320,6 +330,15 @@ public class MechanicalGroup {
         Arrays.fill(inputPower, 0, n, null);
         Arrays.fill(depth, 0, n, 0);
 
+        final boolean[] conflict;
+        if (conflictBuf.length >= n) {
+            conflict = conflictBuf;
+        } else {
+            conflict = new boolean[n];
+            conflictBuf = conflict;
+        }
+        Arrays.fill(conflict, 0, n, false);
+
         final Queue<Integer> queue = queueBuf;
         queue.clear();
 
@@ -374,6 +393,7 @@ public class MechanicalGroup {
                 // (раздатка/коническая на разных выходах дают разное).
                 edgeScratch.copyFrom(inputPower[i]);
                 edgeScratch.copyFrom(from.transform(inputPower[i], dir));
+                applyEfficiency(from, edgeScratch);
                 RotationalPower in = edgeScratch;
                 for (int h = 0; h < hooks.size(); h++) {
                     in = hooks.get(h).onTransmit(from, machines[j], in, simContext);
@@ -391,11 +411,27 @@ public class MechanicalGroup {
                 }
 
                 // Слияние входов (узел может питаться от нескольких родителей):
-                // обороты — max, момент — сумма, направление — от первого входа
-                if (in.getSpeedRaw() > inputPower[j].getSpeedRaw()) {
-                    inputPower[j].setSpeedRaw(in.getSpeedRaw());
+                // обороты — max, момент — ЗНАКОВАЯ сумма: встречные источники
+                // ГАСЯТ друг друга (момент уходит в тепло узла), а не складываются.
+                // Направление узла задаёт первый родитель; более сильный
+                // встречный поток переориентирует узел.
+                if (inputPower[j].getDirection() == in.getDirection()) {
+                    if (in.getSpeedRaw() > inputPower[j].getSpeedRaw()) {
+                        inputPower[j].setSpeedRaw(in.getSpeedRaw());
+                    }
+                    inputPower[j].plus(0, in.getTorqueRaw());
+                } else {
+                    // КОНФЛИКТ НАПРАВЛЕНИЙ (см. док, «Перегруз», случай 3)
+                    inputPower[j].plus(0, -in.getTorqueRaw());
+                    if (inputPower[j].getTorqueRaw() < 0) {
+                        inputPower[j].setDirection(in.getDirection());
+                        inputPower[j].setTorqueRaw(-inputPower[j].getTorqueRaw());
+                        if (in.getSpeedRaw() > inputPower[j].getSpeedRaw()) {
+                            inputPower[j].setSpeedRaw(in.getSpeedRaw());
+                        }
+                    }
+                    conflict[j] = true;
                 }
-                inputPower[j].plus(0, in.getTorqueRaw());
 
                 edgeFrom[edgeCount] = i;
                 edgeTo[edgeCount] = j;
@@ -405,10 +441,24 @@ public class MechanicalGroup {
             }
         }
 
+        // Гистерезис конфликта направлений: клин только при N тиках подряд
+        boolean hasConflict = false;
+        for (int i = 0; i < n; i++) {
+            if (conflict[i]) {
+                hasConflict = true;
+                break;
+            }
+        }
+        directionConflictTicks = hasConflict ? directionConflictTicks + 1 : 0;
+        final boolean directionJam = directionConflictTicks >= DIRECTION_JAM_TICKS;
+
         // --- Фаза B: динамика оборотов сети (инерция/трение/нагрузка) ---
         long targetSpeedRaw = 0;
         long sourceTorqueRaw = 0;
         boolean hasSource = false;
+        // Опорное направление сети = направление первого источника:
+        // встречные источники ВЫЧИТАЮТСЯ из тяги (конфликт направлений)
+        byte refDirection = -1;
         double totalInertia = 0;
         long frictionTorque = 0;
         long loadTorque = 0;
@@ -422,7 +472,7 @@ public class MechanicalGroup {
             // ветви (за потребителем, куда мощность не доходит) сеть
             // не нагружают — они механически с ней не связаны.
             if (in != null || machine.getReceived().getSpeedRaw() > 0) {
-                totalInertia += machine.getInertia();
+                totalInertia += machine.getInertia() + machine.getExtraInertia();
                 final long friction = machine.getFrictionTorque(currentSpeedRaw);
                 frictionTorque += friction;
                 // Симуляционный тик: трение греет, конвекция остужает
@@ -433,16 +483,31 @@ public class MechanicalGroup {
                 final RotationalPower output = machine.getOutput();
                 if (output != null) {
                     hasSource = true;
+                    if (refDirection == -1) {
+                        refDirection = output.getDirection();
+                    }
                     if (output.getSpeedRaw() > targetSpeedRaw) {
                         targetSpeedRaw = output.getSpeedRaw();
                     }
-                    sourceTorqueRaw += output.getTorqueRaw();
+                    // Знаковая сумма: встречный источник гасит тягу
+                    if (output.getDirection() == refDirection) {
+                        sourceTorqueRaw += output.getTorqueRaw();
+                    } else {
+                        sourceTorqueRaw -= output.getTorqueRaw();
+                    }
                 } else if (currentSpeedRaw >= machine.getRequired().getSpeedRaw()
                         || machine.getWorkState() == WorkState.JAMMED) {
                     // Потребитель, чьи обороты достаточны, нагружает сеть.
-                    // Заклинившая машина продолжает давить (статическое трение) —
-                    // клин не даёт цепи раскрутиться обратно.
-                    loadTorque += machine.getRequired().getTorqueRaw();
+                    // Заклинившая давит СТРАГИВАНИЕМ (статическое трение
+                    // заклиненного механизма) — клин не даёт раскрутиться.
+                    loadTorque += Math.max(
+                            machine.getRequired().getTorqueRaw(),
+                            machine.getBreakawayTorqueRaw());
+                }
+                // Холостой ход: вращающаяся машина ест момент даже без
+                // полезной работы (трение рабочего органа, вентиляция)
+                if (currentSpeedRaw > 0) {
+                    loadTorque += machine.getIdleTorqueRaw();
                 }
             }
         }
@@ -586,13 +651,15 @@ public class MechanicalGroup {
             // Направление вращения
             final RotationalPower required = machine.getRequired();
 
-            // Клин держится, пока потребность машины не удовлетворима:
-            // скорость обнулилась, но источник продолжает давить моментом
-            // меньше требуемого — машина остаётся перегруженной, и фаза D
-            // заклинивает её заново (иначе клин стирался бы через тик).
+            // Клин держится, пока потребность машины (полезная или момент
+            // страгивания) не удовлетворима: скорость обнулилась, но источник
+            // продолжает давить моментом меньше требуемого — машина остаётся
+            // перегруженной, и фаза D заклинивает её заново (иначе клин
+            // стирался бы через тик).
+            final long holdTorque = Math.max(required.getTorqueRaw(), machine.getBreakawayTorqueRaw());
             if (machine.getWorkState() == WorkState.JAMMED
-                    && required.getTorqueRaw() > 0
-                    && in.getTorqueRaw() < required.getTorqueRaw()) {
+                    && holdTorque > 0
+                    && in.getTorqueRaw() < holdTorque) {
                 states[m] = WorkState.INSUFFICIENT_POWER;
                 continue;
             }
@@ -600,6 +667,14 @@ public class MechanicalGroup {
             final byte requiredDirection = machine.getRequiredDirection();
             if (requiredDirection != -1 && in.getDirection() != requiredDirection) {
                 states[m] = WorkState.WRONG_DIRECTION;
+                continue;
+            }
+
+            // Страгивание: входного момента меньше нужного для троганья —
+            // машина не стартует и клинит цепь (фаза D разносит клин вверх)
+            if (machine.getBreakawayTorqueRaw() > 0
+                    && in.getTorqueRaw() < machine.getBreakawayTorqueRaw()) {
+                states[m] = WorkState.INSUFFICIENT_POWER;
                 continue;
             }
 
@@ -645,6 +720,18 @@ public class MechanicalGroup {
                 jammed[i] = true;
                 states[i] = WorkState.JAMMED;
                 jammedMachines.add(machines[i]);
+            }
+        }
+
+        // Конфликт направлений держится N тиков подряд — сеть встаёт клином
+        // целиком (встречные потоки связывают механику, энергия уходит в тепло)
+        if (directionJam) {
+            for (int i = 0; i < n; i++) {
+                if (inputPower[i] != null && !jammed[i]) {
+                    jammed[i] = true;
+                    states[i] = WorkState.JAMMED;
+                    jammedMachines.add(machines[i]);
+                }
             }
         }
 
@@ -705,5 +792,23 @@ public class MechanicalGroup {
             return 0;
         }
         return PhysicsMath.torqueForWatts(watts, speedRaw);
+    }
+
+    /**
+     * КПД передачи через машину: момент на выходе умножается на η,
+     * потерянная мощность (1-η) уходит в тепло узла
+     * (P_loss = P_in · (1-η), за тик E += P_loss / 20).
+     */
+    private static void applyEfficiency(MechanicalMachine from, RotationalPower edge) {
+        final double eta = from.getEfficiency();
+        if (eta >= 1.0) {
+            return;
+        }
+        final long edgeWatts = PhysicsMath.watts(edge.getTorqueRaw(), edge.getSpeedRaw());
+        final long lossWatts = Math.round(edgeWatts * (1.0 - eta));
+        edge.setTorqueRaw(Math.round(edge.getTorqueRaw() * eta));
+        if (lossWatts > 0) {
+            from.getSimulationState().addHeatJ(lossWatts / 20.0);
+        }
     }
 }
