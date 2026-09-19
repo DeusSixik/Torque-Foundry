@@ -350,6 +350,9 @@ public class MechanicalGroup {
                 continue;
             }
 
+            // Тик источника: потери -> тепло, тепловой derate момента
+            machines[i].onSourceTick(PhysicsMath.watts(output.getTorqueRaw(), currentSpeedRaw));
+
             // Хук: ослабление источника (износ, топливо, температура)
             for (int h = 0; h < hooks.size(); h++) {
                 output = hooks.get(h).onSourceOutput(machines[i], output, simContext);
@@ -359,6 +362,9 @@ public class MechanicalGroup {
                 inputPower[i] = RotationalPower.fromRaw(0, 0);
             }
             inputPower[i].copyFrom(output);
+            // Тепловой derate: перегретый источник режет паспортный момент
+            inputPower[i].setTorqueRaw(
+                    Math.round(output.getTorqueRaw() * machines[i].getOutputFactor()));
             inputPower[i].setSpeedRaw(currentSpeedRaw);
             queue.add(i);
         }
@@ -483,17 +489,20 @@ public class MechanicalGroup {
                 final RotationalPower output = machine.getOutput();
                 if (output != null) {
                     hasSource = true;
-                    if (refDirection == -1) {
-                        refDirection = output.getDirection();
-                    }
+                    // Цель сети — паспортные обороты источника; тяга — DERATED
+                    // вход (фаза A урезала момент по температуре: перегретый
+                    // генератор реально слабее)
                     if (output.getSpeedRaw() > targetSpeedRaw) {
                         targetSpeedRaw = output.getSpeedRaw();
                     }
+                    if (refDirection == -1) {
+                        refDirection = in.getDirection();
+                    }
                     // Знаковая сумма: встречный источник гасит тягу
-                    if (output.getDirection() == refDirection) {
-                        sourceTorqueRaw += output.getTorqueRaw();
+                    if (in.getDirection() == refDirection) {
+                        sourceTorqueRaw += in.getTorqueRaw();
                     } else {
-                        sourceTorqueRaw -= output.getTorqueRaw();
+                        sourceTorqueRaw -= in.getTorqueRaw();
                     }
                 } else if (currentSpeedRaw >= machine.getRequired().getSpeedRaw()
                         || machine.getWorkState() == WorkState.JAMMED) {

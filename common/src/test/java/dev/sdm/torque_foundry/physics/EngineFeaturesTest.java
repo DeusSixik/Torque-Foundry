@@ -255,4 +255,48 @@ public class EngineFeaturesTest {
                 "rotor inertia must slow spin-up: " + heavy.getCurrentSpeedRpm()
                         + " vs " + light.getCurrentSpeedRpm());
     }
+
+    // --- 6. Тепловой derate генератора ---
+
+    @Test
+    void overloadedGenerator_deratesThenRecovers() {
+        // Генератор с КПД 0.1 (быстрый нагрев) и пределом 100 C тянет
+        // потребителя на 50 Nm: греется -> derate ниже 50 Nm -> потребитель
+        // клинит -> стоит/остывает -> момент вернулся -> снова работает.
+        // Duty cycle (режим S2/S3) возникает из тепловой модели.
+        final MechanicalGroup group = new MechanicalGroup();
+        final GeneratorMachine gen = new GeneratorMachine(
+                256_000, 64_000, RotationDirection.FORWARD, 0.1, 100.0);
+        gen.setBlockPos(new BlockPos(0, 0, 0));
+        group.addElement(gen);
+        group.addElement(shaft(new BlockPos(1, 0, 0)));
+        final ConsumerMachine consumer = new ConsumerMachine(64_000, 50_000, RotationDirection.FORWARD);
+        consumer.setBlockPos(new BlockPos(2, 0, 0));
+        group.addElement(consumer);
+
+        long minReceived = Long.MAX_VALUE;
+        boolean seenJam = false;
+        boolean recoveredAfterJam = false;
+        double factorAtEndOfJam = 0;
+        for (int t = 0; t < 8000; t++) {
+            group.computeTick();
+            minReceived = Math.min(minReceived, consumer.getReceived().getTorqueRaw());
+            if (gen.getWorkState() == WorkState.JAMMED || consumer.getWorkState() == WorkState.JAMMED) {
+                seenJam = true;
+                factorAtEndOfJam = 0;
+            } else if (seenJam) {
+                // после клина следим за максимальным фактором вне клина
+                factorAtEndOfJam = Math.max(factorAtEndOfJam, gen.getOutputFactor());
+                recoveredAfterJam = recoveredAfterJam || factorAtEndOfJam > 0.78;
+            }
+        }
+
+        assertTrue(minReceived < 60_000,
+                "overheated generator must derate below rated, min = " + minReceived);
+        assertTrue(seenJam, "derate must drop consumer into stall at least once");
+        // Восстановление: после клина генератор остывал и фактор поднимался
+        // выше порога отпускания потребителя (50000/64000 = 0.78)
+        assertTrue(recoveredAfterJam,
+                "generator must recover after cooling, max factor after jam = " + factorAtEndOfJam);
+    }
 }
