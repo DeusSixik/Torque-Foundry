@@ -2,13 +2,12 @@ package dev.sdm.torque_foundry.physics.group;
 
 
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
-import dev.sdm.torque_foundry.physics.PhysicsLibrary;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPowerConstants;
-import dev.sdm.torque_foundry.physics.basic.WorkState;
-import dev.sdm.torque_foundry.physics.simulation.physics.PhysicsHook;
-import dev.sdm.torque_foundry.physics.simulation.physics.PhysicsHooks;
+import dev.sdm.torque_foundry.physics.PhysicsMath;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.WorkState;
+import dev.sdm.torque_foundry.physics.hook.PhysicsHook;
+import dev.sdm.torque_foundry.physics.hook.PhysicsHooks;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -30,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * к потребителям (Input), где каждый узел может ТРАНСФОРМИРОВАТЬ мощность.
  * <p>
  * Сеть инерционная: обороты сети (currentSpeedRaw) — интеграл момента
- * (разгон/торможение через PhysicsLibrary.tickSpeed). Материал деталей
+ * (разгон/торможение через PhysicsMath.tickSpeed). Материал деталей
  * задаёт трение и инерцию. Перегрузка сети клинит всю цепь (фаза D).
  * <p>
  * Точки расширения физических условий — хуки {@link PhysicsHook}
@@ -53,7 +52,7 @@ public class MechanicalGroup {
     /**
      * ТЕКУЩИЕ обороты сети (milli-RPM, на базовом уровне — уровне источников).
      * Инерционная величина: раскручивается и выбегает плавно
-     * (см. PhysicsLibrary.tickSpeed). Все скорости ветвей — производные.
+     * (см. PhysicsMath.tickSpeed). Все скорости ветвей — производные.
      */
     protected long currentSpeedRaw;
 
@@ -77,7 +76,7 @@ public class MechanicalGroup {
     private int[] depthBuf = new int[0];
     private long[] subtreeTorqueBuf = new long[0];
     private WorkState[] stateBuf = new WorkState[0];
-    private MechanicalPower[] inputPowerBuf = new MechanicalPower[0];
+    private RotationalPower[] inputPowerBuf = new RotationalPower[0];
     private Integer[] orderBuf = new Integer[0];
     private int[] edgeFromBuf = new int[0];
     private int[] edgeToBuf = new int[0];
@@ -87,7 +86,7 @@ public class MechanicalGroup {
     private final Long2IntMap posToIndexBuf = new Long2IntOpenHashMap();
     private final SimulationContext simContext = new SimulationContext(this, 0);
     private final Queue<Integer> queueBuf = new ArrayDeque<>();
-    private final MechanicalPower edgeScratch = MechanicalPower.fromRaw(0, 0);
+    private final RotationalPower edgeScratch = RotationalPower.fromRaw(0, 0);
 
     private static int[] ensureInt(int[] buffer, int size) {
         return buffer.length >= size ? buffer : new int[size];
@@ -268,7 +267,7 @@ public class MechanicalGroup {
      * output->input. Скорости ветвей считаются от ТЕКУЩИХ оборотов
      * сети (инерция: без мгновенных скачков).
      * Фаза B — динамика: обороты сети = интеграл момента
-     * (PhysicsLibrary.tickSpeed): тяга источников против трения
+     * (PhysicsMath.tickSpeed): тяга источников против трения
      * и нагрузки потребителей.
      * Фаза B2 — demand снизу вверх: момент поддерева каждого узла.
      * Фаза C — состояния сверху вниз: перегруженная сеть — INSUFFICIENT_POWER
@@ -298,7 +297,7 @@ public class MechanicalGroup {
         subtreeTorqueBuf = subtreeTorque;
         final WorkState[] states = ensureObjects(stateBuf, n, WorkState[]::new);
         stateBuf = states;
-        final MechanicalPower[] inputPower = ensureObjects(inputPowerBuf, n, MechanicalPower[]::new);
+        final RotationalPower[] inputPower = ensureObjects(inputPowerBuf, n, RotationalPower[]::new);
         inputPowerBuf = inputPower;
         final Integer[] order = ensureObjects(orderBuf, n, Integer[]::new);
         orderBuf = order;
@@ -327,7 +326,7 @@ public class MechanicalGroup {
         // --- Фаза A: граф мощности (BFS от источников, слияние входов) ---
         // Скорость источника = ТЕКУЩИЕ обороты сети (инерция: без скачков).
         for (int i = 0; i < n; i++) {
-            MechanicalPower output = machines[i].getOutput();
+            RotationalPower output = machines[i].getOutput();
             if (output == null) {
                 continue;
             }
@@ -338,7 +337,7 @@ public class MechanicalGroup {
             }
 
             if (inputPower[i] == null) {
-                inputPower[i] = MechanicalPower.fromRaw(0, 0);
+                inputPower[i] = RotationalPower.fromRaw(0, 0);
             }
             inputPower[i].copyFrom(output);
             inputPower[i].setSpeedRaw(currentSpeedRaw);
@@ -375,7 +374,7 @@ public class MechanicalGroup {
                 // (раздатка/коническая на разных выходах дают разное).
                 edgeScratch.copyFrom(inputPower[i]);
                 edgeScratch.copyFrom(from.transform(inputPower[i], dir));
-                MechanicalPower in = edgeScratch;
+                RotationalPower in = edgeScratch;
                 for (int h = 0; h < hooks.size(); h++) {
                     in = hooks.get(h).onTransmit(from, machines[j], in, simContext);
                 }
@@ -385,7 +384,7 @@ public class MechanicalGroup {
 
                 if (inputPower[j] == null) {
                     // Первое обнаружение j
-                    inputPower[j] = MechanicalPower.fromRaw(0, 0);
+                    inputPower[j] = RotationalPower.fromRaw(0, 0);
                     depth[j] = depth[i] + 1;
                     parent[j] = i;
                     queue.add(j);
@@ -416,7 +415,7 @@ public class MechanicalGroup {
 
         for (int i = 0; i < n; i++) {
             final MechanicalMachine machine = machines[i];
-            final MechanicalPower in = inputPower[i];
+            final RotationalPower in = inputPower[i];
 
             // Трение и инерция — только у ВРАЩАЮЩЕЙСЯ механики: машины
             // с питанием сейчас или ещё выбегающие по инерции. Мёртвые
@@ -424,11 +423,14 @@ public class MechanicalGroup {
             // не нагружают — они механически с ней не связаны.
             if (in != null || machine.getReceived().getSpeedRaw() > 0) {
                 totalInertia += machine.getInertia();
-                frictionTorque += machine.getFrictionTorque(currentSpeedRaw);
+                final long friction = machine.getFrictionTorque(currentSpeedRaw);
+                frictionTorque += friction;
+                // Симуляционный тик: трение греет, конвекция остужает
+                machine.onSimulationTick(friction, currentSpeedRaw);
             }
 
             if (in != null) {
-                final MechanicalPower output = machine.getOutput();
+                final RotationalPower output = machine.getOutput();
                 if (output != null) {
                     hasSource = true;
                     if (output.getSpeedRaw() > targetSpeedRaw) {
@@ -460,7 +462,7 @@ public class MechanicalGroup {
             // тот отключается, и сеть выходит на пилу вокруг порога.
             // Мгновенное обнуление здесь давало бы вечный цикл
             // разгон -> порог -> ноль -> разгон.
-            currentSpeedRaw = PhysicsLibrary.tickSpeed(
+            currentSpeedRaw = PhysicsMath.tickSpeed(
                     currentSpeedRaw, targetSpeedRaw, netTorque, (long) Math.max(1.0, totalInertia));
         }
 
@@ -473,14 +475,14 @@ public class MechanicalGroup {
 
         for (int idx = 0; idx < n; idx++) {
             final int m = order[idx];
-            final MechanicalPower in = inputPower[m];
+            final RotationalPower in = inputPower[m];
 
             if (in == null) {
                 subtreeTorque[m] = 0;
                 continue;
             }
 
-            final MechanicalPower required = machines[m].getRequired();
+            final RotationalPower required = machines[m].getRequired();
 
             // Своя потребность на входе машины. При перегрузе (boggingDown)
             // заклинившая машина давит ПОЛНЫМ весом независимо от оборотов.
@@ -510,7 +512,7 @@ public class MechanicalGroup {
         for (int idx = 0; idx < n; idx++) {
             final int m = order[idx];
             final MechanicalMachine machine = machines[m];
-            final MechanicalPower in = inputPower[m];
+            final RotationalPower in = inputPower[m];
 
             if (in == null) {
                 // Недостижима от источников: машина не powered.
@@ -520,8 +522,7 @@ public class MechanicalGroup {
                 final long lastSpeed = machine.getReceived().getSpeedRaw();
                 if (lastSpeed > 0) {
                     final long friction = machine.getFrictionTorque(lastSpeed);
-                    final long decel = Math.max(1, friction * MechanicalPowerConstants.ACCEL_NUM
-                            / (long) (machine.getInertia() * (MechanicalPowerConstants.ACCEL_DEN / 1000)));
+                    final long decel = PhysicsMath.accelStep(friction, (long) machine.getInertia());
                     final long coasted = Math.max(0, lastSpeed - decel);
                     machine.getReceived().setSpeedRaw(coasted);
                     machine.getReceived().setTorqueRaw(0);
@@ -541,12 +542,14 @@ public class MechanicalGroup {
             long childrenWatts = 0;
             for (int e = 0; e < edgeCount; e++) {
                 if (edgeFrom[e] == m && inputPower[edgeTo[e]] != null) {
-                    childrenWatts += (subtreeTorque[edgeTo[e]]
-                            * MechanicalPowerConstants.PI2_60_NUM / MechanicalPowerConstants.PI2_60_DEN)
-                            * edgeSpeed[e] / MechanicalPowerConstants.SCALE_2;
+                    childrenWatts += PhysicsMath.watts(subtreeTorque[edgeTo[e]], edgeSpeed[e]);
                 }
             }
-            machine.setFreePower(Math.max(0, in.getPower() - childrenWatts));
+            final long freeWatts = Math.max(0, in.getPower() - childrenWatts);
+            machine.setFreePower(freeWatts);
+
+            // Показатели симуляции: мгновенная мощность тика
+            machine.getSimulationState().setTickPower(in.getPower(), childrenWatts, freeWatts);
 
             // Балансовый хук (маховик и др. буферы)
             machine.onNetworkTick(in.getPower(), childrenWatts);
@@ -581,7 +584,7 @@ public class MechanicalGroup {
             }
 
             // Направление вращения
-            final MechanicalPower required = machine.getRequired();
+            final RotationalPower required = machine.getRequired();
 
             // Клин держится, пока потребность машины не удовлетворима:
             // скорость обнулилась, но источник продолжает давить моментом
@@ -680,7 +683,11 @@ public class MechanicalGroup {
         }
 
         for (int i = 0; i < n; i++) {
-            machines[i].setWorkState(states[i] != null ? states[i] : WorkState.IDLE);
+            final WorkState state = states[i] != null ? states[i] : WorkState.IDLE;
+            machines[i].setWorkState(state);
+            if (state == WorkState.INSUFFICIENT_POWER || state == WorkState.JAMMED) {
+                machines[i].getSimulationState().countOverloadTick();
+            }
         }
 
         for (int h = 0; h < hooks.size(); h++) {
@@ -697,7 +704,6 @@ public class MechanicalGroup {
         if (watts <= 0 || speedRaw <= 0) {
             return 0;
         }
-        // P [Вт] = t * s * (2pi/60) / SCALE^2  =>  t = P * SCALE^2 / (s * (2pi/60))
-        return watts * MechanicalPowerConstants.SCALE_2 / (speedRaw * MechanicalPowerConstants.PI2_60_NUM / MechanicalPowerConstants.PI2_60_DEN);
+        return PhysicsMath.torqueForWatts(watts, speedRaw);
     }
 }

@@ -1,72 +1,74 @@
-package dev.sdm.torque_foundry.physics.basic;
+package dev.sdm.torque_foundry.physics;
 
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
 
-import static dev.sdm.torque_foundry.physics.basic.MechanicalPowerConstants.PI2_60_DEN;
-import static dev.sdm.torque_foundry.physics.basic.MechanicalPowerConstants.PI2_60_NUM;
+/**
+ * Мощность вращения на ребре/входе машины: обороты + момент + направление.
+ * Mutable-архитектура: объекты переиспользуются, на тик не создаются.
+ */
+public class RotationalPower {
 
-public class MechanicalPower {
-
-    public static MechanicalPower from(MechanicalPower input) {
-        return new MechanicalPower(
+    public static RotationalPower from(RotationalPower input) {
+        return new RotationalPower(
                 input.speed,
                 input.torque,
                 input.direction
         );
     }
 
-    public static MechanicalPower from(long speed, long torque) {
+    public static RotationalPower from(long speed, long torque) {
         return from(speed, torque, RotationDirection.FORWARD);
     }
 
-    public static MechanicalPower from(long speed, long torque, RotationDirection direction) {
+    public static RotationalPower from(long speed, long torque, RotationDirection direction) {
         return from(speed, torque, direction.index);
     }
 
-    public static MechanicalPower from(long speed, long torque, byte direction) {
-        return new MechanicalPower(
-                speed * MechanicalPowerConstants.SCALE,
-                torque * MechanicalPowerConstants.SCALE,
+    /** СИ-вход (RPM, Nm) — внутри умножается на SCALE. */
+    public static RotationalPower from(long speed, long torque, byte direction) {
+        return new RotationalPower(
+                speed * PhysicsConstants.SCALE,
+                torque * PhysicsConstants.SCALE,
                 direction
         );
     }
 
-    public static MechanicalPower fromRaw(long speedRaw, long torqueRaw) {
+    public static RotationalPower fromRaw(long speedRaw, long torqueRaw) {
         return fromRaw(speedRaw, torqueRaw, RotationDirection.FORWARD);
     }
 
-    public static MechanicalPower fromRaw(long speedRaw, long torqueRaw, RotationDirection direction) {
+    public static RotationalPower fromRaw(long speedRaw, long torqueRaw, RotationDirection direction) {
         return fromRaw(speedRaw, torqueRaw, direction.index);
     }
 
-    public static MechanicalPower fromRaw(long speedRaw, long torqueRaw, byte direction) {
-        return new MechanicalPower(speedRaw, torqueRaw, direction);
+    public static RotationalPower fromRaw(long speedRaw, long torqueRaw, byte direction) {
+        return new RotationalPower(speedRaw, torqueRaw, direction);
     }
 
     /**
-     * RPM in milli-RPM = A / {@link MechanicalPowerConstants#SCALE}
+     * Обороты в milli-RPM = A / {@link PhysicsConstants#SCALE}
      */
     protected long speed;
 
     /**
-     * Nm in milli-Nm = A / {@link MechanicalPowerConstants#SCALE}
+     * Момент в milli-Nm = A / {@link PhysicsConstants#SCALE}
      */
     protected long torque;
 
     /**
-     * Rotation direction {@link RotationDirection}
+     * Направление вращения {@link RotationDirection}
      */
     protected byte direction;
 
-    protected MechanicalPower(long speed, long torque, byte direction) {
+    protected RotationalPower(long speed, long torque, byte direction) {
         this.speed = speed;
         this.torque = torque;
         this.direction = direction;
     }
 
-    public void copyFrom(@NotNull MechanicalPower power) {
+    public void copyFrom(@NotNull RotationalPower power) {
         this.speed = power.speed;
         this.torque = power.torque;
         this.direction = power.direction;
@@ -95,16 +97,18 @@ public class MechanicalPower {
         this.setTorque(torque);
     }
 
+    /** СИ-вход (RPM) — внутри умножается на SCALE. */
     public void setSpeed(long speed) {
-        this.speed = speed * MechanicalPowerConstants.SCALE;
+        this.speed = speed * PhysicsConstants.SCALE;
     }
 
     public void setSpeedRaw(long speed) {
         this.speed = speed;
     }
 
+    /** СИ-вход (Nm) — внутри умножается на SCALE. */
     public void setTorque(long torque) {
-        this.torque = torque * MechanicalPowerConstants.SCALE;
+        this.torque = torque * PhysicsConstants.SCALE;
     }
 
     public void setTorqueRaw(long torque) {
@@ -132,49 +136,50 @@ public class MechanicalPower {
     }
 
     public double getSpeedRpm() {
-        return this.speed / (double) MechanicalPowerConstants.SCALE;
+        return this.speed / (double) PhysicsConstants.SCALE;
     }
 
     public double getTorqueNm() {
-        return this.torque / (double) MechanicalPowerConstants.SCALE;
+        return this.torque / (double) PhysicsConstants.SCALE;
     }
 
+    /** Мощность в ваттах (double, для отображения). */
     public double getPowerWatts() {
-        return (double) this.torque * this.speed * (2.0 * Math.PI / 60.0) / MechanicalPowerConstants.SCALE_2;
+        return (double) this.torque * this.speed * (2.0 * Math.PI / 60.0) / PhysicsConstants.SCALE_2;
     }
 
+    /** Мощность в ваттах (целочисленно, без потерь округления). */
     public long getPower() {
-        long num = this.torque * PI2_60_NUM;
-        return (num / PI2_60_DEN) * this.speed / MechanicalPowerConstants.SCALE_2;
+        return PhysicsMath.watts(this.torque, this.speed);
     }
 
     @Override
     public String toString() {
         return String.format(Locale.ROOT,
-                "MechanicalPower{speed=%.3f RPM, torque=%.3f Nm, power=%s powerWatts=%.3f W, dir=%s}",
+                "RotationalPower{speed=%.3f RPM, torque=%.3f Nm, power=%d W, powerWatts=%.3f W, dir=%s}",
                 getSpeedRpm(),
                 getTorqueNm(),
                 getPower(),
                 getPowerWatts(),
-                RotationDirection.from(this.direction) // или this.direction, если нет вспомогательного метода
+                RotationDirection.from(this.direction)
         );
     }
 
-    public MechanicalPower plus(MechanicalPower power) {
+    public RotationalPower plus(RotationalPower power) {
         return plus(power.speed, power.torque);
     }
 
-    public MechanicalPower plus(long speed, long torque) {
+    public RotationalPower plus(long speed, long torque) {
         this.speed += speed;
         this.torque += torque;
         return this;
     }
 
-    public MechanicalPower minus(MechanicalPower power) {
+    public RotationalPower minus(RotationalPower power) {
         return minus(power.speed, power.torque);
     }
 
-    public MechanicalPower minus(long speed, long torque) {
+    public RotationalPower minus(long speed, long torque) {
         this.speed -= speed;
         this.torque -= torque;
         return this;

@@ -5,7 +5,7 @@ import dev.architectury.registry.registries.Registrar;
 import dev.architectury.registry.registries.RegistrarManager;
 import dev.architectury.registry.registries.RegistrySupplier;
 import dev.sdm.torque_foundry.TorqueFoundry;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.RotationalPower;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;

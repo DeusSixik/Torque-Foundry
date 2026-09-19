@@ -1,7 +1,7 @@
-package dev.sdm.torque_foundry.physics.simulation.physics;
+package dev.sdm.torque_foundry.physics.hook;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 
@@ -30,15 +30,15 @@ public interface PhysicsHook {
     default void onGroupTickStart(MechanicalGroup group, SimulationContext context) {
     }
 
-    default MechanicalPower onSourceOutput(MechanicalMachine source, MechanicalPower output, SimulationContext context) {
+    default RotationalPower onSourceOutput(MechanicalMachine source, RotationalPower output, SimulationContext context) {
         return output;
     }
 
-    default MechanicalPower onTransmit(MechanicalMachine from, MechanicalMachine to, MechanicalPower power, SimulationContext context) {
+    default RotationalPower onTransmit(MechanicalMachine from, MechanicalMachine to, RotationalPower power, SimulationContext context) {
         return power;
     }
 
-    default MechanicalPower onReceive(MechanicalMachine machine, MechanicalPower power, SimulationContext context) {
+    default RotationalPower onReceive(MechanicalMachine machine, RotationalPower power, SimulationContext context) {
         return power;
     }
 

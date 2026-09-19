@@ -1,7 +1,7 @@
 package dev.sdm.torque_foundry.core.block;
 
-import dev.sdm.torque_foundry.physics.basic.MachineMaterial;
-import dev.sdm.torque_foundry.physics.basic.MachineMaterials;
+import dev.sdm.torque_foundry.physics.material.PhysicsMaterial;
+import dev.sdm.torque_foundry.physics.material.PhysicsMaterials;
 import net.minecraft.util.StringRepresentable;
 
 /**
@@ -10,17 +10,17 @@ import net.minecraft.util.StringRepresentable;
  * вклад в инерцию и трение сети.
  */
 public enum ShaftMaterial implements StringRepresentable {
-    WOOD("wood", MachineMaterials.WOOD),
-    BRONZE("bronze", MachineMaterials.BRONZE),
-    IRON("iron", MachineMaterials.IRON),
-    STEEL("steel", MachineMaterials.STEEL);
+    WOOD("wood", PhysicsMaterials.WOOD),
+    BRONZE("bronze", PhysicsMaterials.BRONZE),
+    IRON("iron", PhysicsMaterials.IRON),
+    STEEL("steel", PhysicsMaterials.STEEL);
 
     private final String name;
 
     /** Физический материал машины (лимиты, трение, плотность). */
-    public final MachineMaterial machine;
+    public final PhysicsMaterial machine;
 
-    ShaftMaterial(String name, MachineMaterial machine) {
+    ShaftMaterial(String name, PhysicsMaterial machine) {
         this.name = name;
         this.machine = machine;
     }

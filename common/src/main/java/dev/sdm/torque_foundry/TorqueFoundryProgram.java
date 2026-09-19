@@ -3,8 +3,8 @@ package dev.sdm.torque_foundry;
 
 import dev.sdm.torque_foundry.core.client.render.Model;
 import dev.sdm.torque_foundry.core.client.render.structs.Quad;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.minecraft.resources.ResourceLocation;
 
@@ -33,7 +33,7 @@ public class TorqueFoundryProgram {
     public static void iteration(MechanicalGroup group) {
         var machines = group.getMachines();
 
-        MechanicalPower power = MechanicalPower.from(256, 64);
+        RotationalPower power = RotationalPower.from(256, 64);
         final long availableTorque = power.getTorqueRaw();
         final long currentSpeed = power.getSpeedRaw();
 
@@ -42,7 +42,7 @@ public class TorqueFoundryProgram {
 
         long totalRequiredTorque = 0;
         for (MechanicalMachine machine : machines) {
-            MechanicalPower required = machine.getRequired();
+            RotationalPower required = machine.getRequired();
 
             if(currentSpeed >= required.getSpeedRaw()) {
                 totalRequiredTorque += required.getTorqueRaw();

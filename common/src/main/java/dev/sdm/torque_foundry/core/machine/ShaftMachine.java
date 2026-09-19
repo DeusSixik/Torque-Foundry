@@ -1,8 +1,8 @@
-﻿package dev.sdm.torque_foundry.core.machine;
+package dev.sdm.torque_foundry.core.machine;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine.PortRole;
 import net.minecraft.core.Direction;
 
 /**
@@ -13,7 +13,7 @@ import net.minecraft.core.Direction;
 public class ShaftMachine extends MechanicalMachine {
 
     public ShaftMachine() {
-        super(MechanicalPower.fromRaw(0, 0), (byte) -1);
+        super(RotationalPower.fromRaw(0, 0), (byte) -1);
         setPassive(true);
         applyAxisPorts();
     }

@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.physics.basic;
+package dev.sdm.torque_foundry.physics.material;
 
 /**
  * Физический паспорт материала механических деталей — только реальные
@@ -27,7 +27,7 @@ package dev.sdm.torque_foundry.physics.basic;
  * <p>Создание — через {@link Builder}: независимые константы задаются явно,
  * зависимые (G, τ_y, σ₋₁) выводятся по формулам теории упругости и сопромата.
  */
-public record MachineMaterial(
+public record PhysicsMaterial(
         /** Отображаемое имя. */
         String name,
 
@@ -89,7 +89,7 @@ public record MachineMaterial(
      */
     private static final double REF_SAFE_RPM = 256.0;
 
-    public MachineMaterial {
+    public PhysicsMaterial {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("material name must not be blank");
         }
@@ -145,6 +145,19 @@ public record MachineMaterial(
      */
     public double mass(double volumeM3) {
         return densityKgM3 * volumeM3;
+    }
+
+    /**
+     * Номинальный объём детали, пока у машин нет своей геометрии: 1000 см³.
+     */
+    public static final double NOMINAL_PART_VOLUME_M3 = 0.001;
+
+    /**
+     * Номинальная масса детали: m = ρ · 1000 см³ (сталь ~7.85 kg, дерево ~0.7 kg).
+     * Заменяется реальной геометрией, когда машины её получат.
+     */
+    public double nominalMassKg() {
+        return mass(NOMINAL_PART_VOLUME_M3);
     }
 
     /**
@@ -291,6 +304,7 @@ public record MachineMaterial(
                     .shearModulusGpa(0.7)
                     .yieldStrengthMpa(30)
                     .tensileStrengthMpa(100)
+                    .fatigueStrengthMpa(35)
                     .hardnessHb(5)
                     .frictionCoefficient(0.40)
                     .thermalExpansionPpmPerK(5.0)
@@ -308,6 +322,7 @@ public record MachineMaterial(
                     .poissonRatio(0.34)
                     .yieldStrengthMpa(260)
                     .tensileStrengthMpa(350)
+                    .fatigueStrengthMpa(122.5)
                     .hardnessHb(90)
                     .frictionCoefficient(0.16)
                     .thermalExpansionPpmPerK(18.0)
@@ -325,6 +340,7 @@ public record MachineMaterial(
                     .poissonRatio(0.25)
                     .yieldStrengthMpa(240)
                     .tensileStrengthMpa(250)
+                    .fatigueStrengthMpa(100)
                     .hardnessHb(200)
                     .frictionCoefficient(0.45)
                     .thermalExpansionPpmPerK(11.0)
@@ -417,7 +433,7 @@ public record MachineMaterial(
             return this;
         }
 
-        public MachineMaterial build() {
+        public PhysicsMaterial build() {
             // 1. Упругость: G = E / (2(1+ν))
             final double shearGpa = customShearModulusGpa != null
                     ? customShearModulusGpa
@@ -431,7 +447,7 @@ public record MachineMaterial(
                     ? customFatigueStrengthMpa
                     : tensileStrengthMpa * 0.45;
 
-            return new MachineMaterial(name,
+            return new PhysicsMaterial(name,
                     densityKgM3, shearGpa, youngModulusGpa, poissonRatio,
                     yieldStrengthMpa, yieldShear, tensileStrengthMpa, fatigue, hardnessHb,
                     frictionCoefficient, thermalExpansionPpmPerK,

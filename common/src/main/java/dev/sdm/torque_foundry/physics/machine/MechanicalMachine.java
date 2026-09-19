@@ -1,5 +1,11 @@
-package dev.sdm.torque_foundry.physics.basic;
+package dev.sdm.torque_foundry.physics.machine;
 
+import dev.sdm.torque_foundry.physics.PhysicsMath;
+import dev.sdm.torque_foundry.physics.RotationDirection;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.WorkState;
+import dev.sdm.torque_foundry.physics.material.PhysicsMaterial;
+import dev.sdm.torque_foundry.physics.material.PhysicsMaterials;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
@@ -28,20 +34,20 @@ public class MechanicalMachine {
     }
 
     public static MechanicalMachine from(long requiredSpeed, long requiredTorque, RotationDirection direction) {
-        MechanicalPower req = MechanicalPower.from(requiredSpeed, requiredTorque);
+        RotationalPower req = RotationalPower.from(requiredSpeed, requiredTorque);
         return new MechanicalMachine(req, direction == null ? -1 : direction.index);
     }
 
     public static MechanicalMachine fromRaw(long requiredSpeedRaw, long requiredTorqueRaw, RotationDirection direction) {
-        MechanicalPower req = MechanicalPower.fromRaw(requiredSpeedRaw, requiredTorqueRaw);
+        RotationalPower req = RotationalPower.fromRaw(requiredSpeedRaw, requiredTorqueRaw);
         return new MechanicalMachine(req, direction == null ? -1 : direction.index);
     }
 
     protected static final Direction[] EMPTY_DIRECTIONS = new Direction[0];
 
-    // required храним как MechanicalPower — переиспользуем его SCALE-логику,
+    // required храним как RotationalPower — переиспользуем его SCALE-логику,
     // а не дублируем формулы конверсии тут
-    protected final MechanicalPower required;
+    protected final RotationalPower required;
     protected final byte requiredDirection; // -1 = направление не важно
     protected long groupIndex = -1;
     protected int groupElementIndex = -1;
@@ -54,13 +60,18 @@ public class MechanicalMachine {
     /**
      * Мощность сети, полученная машиной на прошлом физическом тике.
      */
-    protected final MechanicalPower received = MechanicalPower.fromRaw(0, 0);
+    protected final RotationalPower received = RotationalPower.fromRaw(0, 0);
 
     /**
      * Свободная мощность узла (в ваттах): received минус требования детей.
      * "Сколько осталось в этом узле на собственные нужды".
      */
     protected long freePower;
+
+    /**
+     * Показатели симуляции (мощность за тик, тепло, счётчики ресурса).
+     */
+    private final SimulationState simulationState = new SimulationState();
 
     /**
      * Локальные порты машины (в системе координат блока при повороте 0).
@@ -87,8 +98,8 @@ public class MechanicalMachine {
     /**
      * Материал деталей машины: инерция (плотность), трение, безопасные обороты.
      */
-    private MachineMaterial material =
-            MachineMaterials.IRON;
+    private PhysicsMaterial material =
+            PhysicsMaterials.IRON;
 
     /**
      * Ориентация блока: в какую мировую сторону смотрит локальный NORTH.
@@ -109,7 +120,7 @@ public class MechanicalMachine {
         this.pos = pos;
     }
 
-    protected MechanicalMachine(MechanicalPower required, byte requiredDirection) {
+    protected MechanicalMachine(RotationalPower required, byte requiredDirection) {
         this.required = required;
         this.requiredDirection = requiredDirection;
         createDirections();
@@ -126,7 +137,7 @@ public class MechanicalMachine {
     /**
      * Выдаваемая мощность источника. Не источник — null.
      */
-    public MechanicalPower getOutput() {
+    public RotationalPower getOutput() {
         return null;
     }
 
@@ -134,7 +145,7 @@ public class MechanicalMachine {
         return requiredDirection;
     }
 
-    public MechanicalPower getRequired() {
+    public RotationalPower getRequired() {
         return required;
     }
 
@@ -165,11 +176,11 @@ public class MechanicalMachine {
     /**
      * Мощность сети, полученная машиной (заполняется физическим тиком).
      */
-    public MechanicalPower getReceived() {
+    public RotationalPower getReceived() {
         return received;
     }
 
-    public void setReceived(MechanicalPower power) {
+    public void setReceived(RotationalPower power) {
         this.received.copyFrom(power);
     }
 
@@ -192,7 +203,7 @@ public class MechanicalMachine {
      * @param input      мощность на входе машины
      * @param outputSide грань, через которую мощность покидает машину
      */
-    public MechanicalPower transform(MechanicalPower input, Direction outputSide) {
+    public RotationalPower transform(RotationalPower input, Direction outputSide) {
         return input;
     }
 
@@ -203,6 +214,29 @@ public class MechanicalMachine {
      * Вызывается в потоке физики.
      */
     public void onNetworkTick(long receivedWatts, long childrenWatts) {
+    }
+
+    /**
+     * Показатели симуляции (мощность, тепло, ресурс) — мутабельная структура,
+     * живёт в машине всё время существования. Тепло/деградация/буферы — читай
+     * и пиши сюда вместо новых полей машины.
+     */
+    public SimulationState getSimulationState() {
+        return simulationState;
+    }
+
+    /**
+     * Симуляционный тик машины: нагрев трением + пассивное охлаждение.
+     * Вызывается конвейером в фазе динамики для всех вращающихся машин.
+     * Переопределяется для своей теплофизики (печи, тормоза и т.п.).
+     *
+     * @param frictionTorqueMilliNm момент трения этой машины, milli-Nm
+     * @param speedMilliRpm         обороты, milli-RPM
+     */
+    public void onSimulationTick(long frictionTorqueMilliNm, long speedMilliRpm) {
+        final double massKg = material.nominalMassKg();
+        simulationState.addFrictionHeat(frictionTorqueMilliNm, speedMilliRpm);
+        simulationState.coolTick(material, massKg);
     }
 
     public boolean isPassive() {
@@ -240,13 +274,13 @@ public class MechanicalMachine {
         this.axis = axis;
     }
 
-    public MachineMaterial getMaterial() {
+    public PhysicsMaterial getMaterial() {
         return material;
     }
 
-    public void setMaterial(MachineMaterial material) {
+    public void setMaterial(PhysicsMaterial material) {
         this.material = material == null
-                ? MachineMaterials.DEFAULT : material;
+                ? PhysicsMaterials.DEFAULT : material;
     }
 
     /**
@@ -264,7 +298,7 @@ public class MechanicalMachine {
      * чтобы сеть всегда останавливалась трением.
      */
     public long getFrictionTorque(long speedRaw) {
-        return Math.max(1, Math.round(material.viscousFriction() * speedRaw));
+        return PhysicsMath.viscousFrictionTorque(material.viscousFriction(), speedRaw);
     }
 
     public Direction getFacing() {

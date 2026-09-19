@@ -3,10 +3,10 @@ package dev.sdm.torque_foundry.api.block;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.core.network.ClientGroupCache;
 import dev.sdm.torque_foundry.core.network.TFNetworking;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
-import dev.sdm.torque_foundry.physics.basic.WorkState;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.RotationDirection;
+import dev.sdm.torque_foundry.physics.WorkState;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -26,7 +26,7 @@ public class MechanicalBlockEntity extends BlockEntity {
             throw new IllegalArgumentException("MechanicalBlocks only support MechanicalBlocks");
         }
 
-        final MechanicalPower power = block.power;
+        final RotationalPower power = block.power;
         this.machine = createMachine(power);
         this.machine.setBlockPos(blockPos);
         this.machine.setMaterial(block.materialOf(blockState));
@@ -101,7 +101,7 @@ public class MechanicalBlockEntity extends BlockEntity {
                 * (RotationDirection.from(machine.getReceived().getDirection()) == RotationDirection.FORWARD ? 1 : -1);
     }
 
-    protected MechanicalMachine createMachine(MechanicalPower power) {
+    protected MechanicalMachine createMachine(RotationalPower power) {
         return MechanicalMachine.fromRaw(power.getSpeedRaw(),
                 power.getTorqueRaw(), RotationDirection.from(power.getDirection())
         );

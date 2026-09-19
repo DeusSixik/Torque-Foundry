@@ -1,22 +1,20 @@
-package dev.sdm.torque_foundry.physics.simulation.physics;
+package dev.sdm.torque_foundry.physics.hook.impl;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPowerConstants;
-import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
+import dev.sdm.torque_foundry.physics.PhysicsConstants;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.hook.PhysicsHook;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
-
-import java.util.ArrayList;
 
 /**
  * Пример физического условия: износ валов на оборотах выше безопасного
- * лимита МАТЕРИАЛА (см. MachineMaterial.maxSafeSpeedRpm).
+ * лимита МАТЕРИАЛА (см. PhysicsMaterial.maxSafeSpeedRpm()).
  *
- * Железный вал (256 RPM) на 256 RPM не изнашивается вовсе; на 400 RPM
- * (стальной лимит) теряет момент за каждый проход. Деревянный вал
- * (лимит 120 RPM) на 256 RPM теряет очень быстро.
+ * <p>Железный вал (лимит ~301 RPM) на 256 RPM не изначивается вовсе;
+ * на 400 RPM теряет момент за каждый проход. Деревянный вал (лимит ~107)
+ * на 256 RPM теряет быстро.
  *
- * Mutable-архитектура: хук МОДИФИЦИРУЕТ переданный MechanicalPower
+ * <p>Mutable-архитектура: хук МОДИФИЦИРУЕТ переданный RotationalPower
  * и возвращает его же — новых объектов на тик не создаётся.
  */
 public final class ShaftWearHook implements PhysicsHook {
@@ -25,13 +23,13 @@ public final class ShaftWearHook implements PhysicsHook {
     private static final double WEAR_FACTOR = 0.01;
 
     @Override
-    public MechanicalPower onTransmit(MechanicalMachine from, MechanicalMachine to, MechanicalPower power, SimulationContext context) {
+    public RotationalPower onTransmit(MechanicalMachine from, MechanicalMachine to, RotationalPower power, SimulationContext context) {
         if (!(from instanceof dev.sdm.torque_foundry.core.machine.ShaftMachine)) {
             return power;
         }
 
         // Лимит материала в RPM -> milli-RPM (юниты скорости сети)
-        final long safe = from.getMaterial().maxSafeSpeedRpm() * MechanicalPowerConstants.SCALE;
+        final long safe = from.getMaterial().maxSafeSpeedRpm() * PhysicsConstants.SCALE;
         final long speed = power.getSpeedRaw();
         if (speed <= safe) {
             return power;

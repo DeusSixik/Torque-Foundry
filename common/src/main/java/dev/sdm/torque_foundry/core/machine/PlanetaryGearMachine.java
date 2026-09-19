@@ -1,9 +1,9 @@
-﻿package dev.sdm.torque_foundry.core.machine;
+package dev.sdm.torque_foundry.core.machine;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.RotationDirection;
 import net.minecraft.core.Direction;
 
 /**
@@ -32,7 +32,7 @@ public class PlanetaryGearMachine extends MechanicalMachine {
 
     public PlanetaryGearMachine(PlanetaryMode mode, int teethSun, int teethRing,
                                 Direction inputSide, Direction outputSide) {
-        super(MechanicalPower.fromRaw(0, 0), (byte) -1);
+        super(RotationalPower.fromRaw(0, 0), (byte) -1);
         this.mode = mode;
         this.outputSide = outputSide;
 
@@ -65,7 +65,7 @@ public class PlanetaryGearMachine extends MechanicalMachine {
     }
 
     @Override
-    public MechanicalPower transform(MechanicalPower input, Direction outputSide) {
+    public RotationalPower transform(RotationalPower input, Direction outputSide) {
         if (outputSide != this.outputSide) {
             return input;
         }
@@ -79,6 +79,6 @@ public class PlanetaryGearMachine extends MechanicalMachine {
                 ? RotationDirection.opposite(input.getDirection())
                 : input.getDirection();
 
-        return MechanicalPower.fromRaw(outSpeedRaw, outTorqueRaw, dir);
+        return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, dir);
     }
 }

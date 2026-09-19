@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.physics.basic;
+﻿package dev.sdm.torque_foundry.physics;
 
 public enum RotationDirection {
     FORWARD(0),

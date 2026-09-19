@@ -3,8 +3,8 @@ package dev.sdm.torque_foundry.physics;
 import dev.sdm.torque_foundry.core.machine.ConsumerMachine;
 import dev.sdm.torque_foundry.core.machine.GeneratorMachine;
 import dev.sdm.torque_foundry.core.machine.ShaftMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationDirection;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.minecraft.core.BlockPos;
 

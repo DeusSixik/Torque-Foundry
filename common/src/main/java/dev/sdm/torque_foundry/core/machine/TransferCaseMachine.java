@@ -1,8 +1,8 @@
-﻿package dev.sdm.torque_foundry.core.machine;
+package dev.sdm.torque_foundry.core.machine;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine.PortRole;
 import net.minecraft.core.Direction;
 
 /**
@@ -19,7 +19,7 @@ public class TransferCaseMachine extends MechanicalMachine {
     public TransferCaseMachine(Direction inputSide,
                                Direction outputSideA, int ratioA,
                                Direction outputSideB, int ratioB) {
-        super(MechanicalPower.fromRaw(0, 0), (byte) -1);
+        super(RotationalPower.fromRaw(0, 0), (byte) -1);
         this.outputSideA = outputSideA;
         this.outputSideB = outputSideB;
         this.ratioA = Math.max(1, ratioA);
@@ -35,15 +35,15 @@ public class TransferCaseMachine extends MechanicalMachine {
     }
 
     @Override
-    public MechanicalPower transform(MechanicalPower input, Direction outputSide) {
+    public RotationalPower transform(RotationalPower input, Direction outputSide) {
         if (outputSide == outputSideA) {
-            return MechanicalPower.fromRaw(
+            return RotationalPower.fromRaw(
                     input.getSpeedRaw() * ratioA,
                     input.getTorqueRaw() / ratioA,
                     input.getDirection());
         }
         if (outputSide == outputSideB) {
-            return MechanicalPower.fromRaw(
+            return RotationalPower.fromRaw(
                     input.getSpeedRaw() * ratioB,
                     input.getTorqueRaw() / ratioB,
                     input.getDirection());

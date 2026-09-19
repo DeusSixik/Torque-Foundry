@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.physics.simulation.physics;
+package dev.sdm.torque_foundry.physics.hook;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -13,7 +13,7 @@ public final class PhysicsHooks {
 
     static {
         // Пример внедрения физического условия (см. класс)
-        register(new ShaftWearHook());
+        register(new dev.sdm.torque_foundry.physics.hook.impl.ShaftWearHook());
     }
 
     public static void register(PhysicsHook hook) {

@@ -1,9 +1,9 @@
-﻿package dev.sdm.torque_foundry.core.machine;
+package dev.sdm.torque_foundry.core.machine;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.RotationDirection;
 import net.minecraft.core.Direction;
 
 /**
@@ -19,7 +19,7 @@ public class BevelGearMachine extends MechanicalMachine {
 
     public BevelGearMachine(int teethIn, int teethOut, boolean reverses,
                             Direction inputSide, Direction outputSide) {
-        super(MechanicalPower.fromRaw(0, 0), (byte) -1);
+        super(RotationalPower.fromRaw(0, 0), (byte) -1);
         this.teethIn = Math.max(1, teethIn);
         this.teethOut = Math.max(1, teethOut);
         this.reverses = reverses;
@@ -34,7 +34,7 @@ public class BevelGearMachine extends MechanicalMachine {
     }
 
     @Override
-    public MechanicalPower transform(MechanicalPower input, Direction outputSide) {
+    public RotationalPower transform(RotationalPower input, Direction outputSide) {
         if (outputSide != this.outputSide) {
             return input;
         }
@@ -45,6 +45,6 @@ public class BevelGearMachine extends MechanicalMachine {
                 ? RotationDirection.opposite(input.getDirection())
                 : input.getDirection();
 
-        return MechanicalPower.fromRaw(outSpeedRaw, outTorqueRaw, dir);
+        return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, dir);
     }
 }

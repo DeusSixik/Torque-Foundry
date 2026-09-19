@@ -2,9 +2,9 @@ package dev.sdm.torque_foundry.core.network;
 
 import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
-import dev.sdm.torque_foundry.physics.basic.WorkState;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.RotationDirection;
+import dev.sdm.torque_foundry.physics.WorkState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
@@ -121,7 +121,7 @@ public final class ClientGroupCache {
 
     private static void applyPhysics(MechanicalBlockEntity mechanical, long state, long speedRaw, long torqueRaw, long direction) {
         mechanical.machine.setWorkState(WorkState.values()[(int) state]);
-        mechanical.machine.setReceived(MechanicalPower.fromRaw(
+        mechanical.machine.setReceived(RotationalPower.fromRaw(
                 speedRaw, torqueRaw, RotationDirection.from((byte) direction)));
     }
 }

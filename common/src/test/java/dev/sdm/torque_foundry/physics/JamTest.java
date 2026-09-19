@@ -3,12 +3,12 @@ package dev.sdm.torque_foundry.physics;
 import dev.sdm.torque_foundry.core.machine.ConsumerMachine;
 import dev.sdm.torque_foundry.core.machine.GeneratorMachine;
 import dev.sdm.torque_foundry.core.machine.ShaftMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
-import dev.sdm.torque_foundry.physics.basic.WorkState;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationDirection;
+import dev.sdm.torque_foundry.physics.WorkState;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
-import dev.sdm.torque_foundry.physics.simulation.physics.PhysicsHook;
-import dev.sdm.torque_foundry.physics.simulation.physics.PhysicsHooks;
+import dev.sdm.torque_foundry.physics.hook.PhysicsHook;
+import dev.sdm.torque_foundry.physics.hook.PhysicsHooks;
 import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.AfterEach;
@@ -51,12 +51,12 @@ public class JamTest {
         hookJammed.clear();
         hookProducers.clear();
         jamCallCount = 0;
-        dev.sdm.torque_foundry.physics.simulation.physics.PhysicsHooks.register(recorder);
+        dev.sdm.torque_foundry.physics.hook.PhysicsHooks.register(recorder);
     }
 
     @AfterEach
     void tearDown() {
-        dev.sdm.torque_foundry.physics.simulation.physics.PhysicsHooks.unregister(recorder);
+        dev.sdm.torque_foundry.physics.hook.PhysicsHooks.unregister(recorder);
     }
 
     /** Генератор(64 Nm) -> 2 вала -> Потребитель(128 Nm) = перегруз x2. */

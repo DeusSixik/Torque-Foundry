@@ -1,8 +1,8 @@
-﻿package dev.sdm.torque_foundry.core.machine;
+package dev.sdm.torque_foundry.core.machine;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine.PortRole;
 import net.minecraft.core.Direction;
 
 /**
@@ -16,7 +16,7 @@ public class BeltDriveMachine extends MechanicalMachine {
     private final Direction outputSide;
 
     public BeltDriveMachine(int ratio, double slip, Direction inputSide, Direction outputSide) {
-        super(MechanicalPower.fromRaw(0, 0), (byte) -1);
+        super(RotationalPower.fromRaw(0, 0), (byte) -1);
         this.ratio = Math.max(1, ratio);
         this.slip = Math.max(0.0, Math.min(1.0, slip));
         this.outputSide = outputSide;
@@ -30,7 +30,7 @@ public class BeltDriveMachine extends MechanicalMachine {
     }
 
     @Override
-    public MechanicalPower transform(MechanicalPower input, Direction outputSide) {
+    public RotationalPower transform(RotationalPower input, Direction outputSide) {
         if (outputSide != this.outputSide) {
             return input;
         }
@@ -39,6 +39,6 @@ public class BeltDriveMachine extends MechanicalMachine {
         final long outTorqueRaw = Math.round(
                 input.getTorqueRaw() / (double) ratio * (1.0 - slip));
 
-        return MechanicalPower.fromRaw(outSpeedRaw, outTorqueRaw, input.getDirection());
+        return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, input.getDirection());
     }
 }

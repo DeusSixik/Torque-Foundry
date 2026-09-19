@@ -4,8 +4,8 @@ import dev.architectury.networking.NetworkManager;
 import dev.architectury.platform.Platform;
 import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.fabricmc.api.EnvType;
 import net.minecraft.core.BlockPos;
@@ -96,7 +96,7 @@ public final class TFNetworking {
                 continue;
             }
 
-            final MechanicalPower received = machine.getReceived();
+            final RotationalPower received = machine.getReceived();
             entries.add(new GroupSyncPayload.Entry(
                     machine.getBlockPos(),
                     machine.getGroupElementIndex(),

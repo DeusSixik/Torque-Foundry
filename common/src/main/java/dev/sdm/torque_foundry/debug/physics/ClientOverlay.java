@@ -9,8 +9,8 @@ import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.core.machine.GeneratorMachine;
 import dev.sdm.torque_foundry.core.network.ClientGroupCache;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import imgui.ImGui;
 import imgui.flag.ImGuiCond;
@@ -144,10 +144,10 @@ public final class ClientOverlay {
         }
     }
 
-    private static String formatPower(MechanicalPower power) {
+    private static String formatPower(RotationalPower power) {
         return String.format(java.util.Locale.ROOT, "%.3f RPM, %.3f Nm, dir=%s",
                 power.getSpeedRpm(), power.getTorqueNm(),
-                dev.sdm.torque_foundry.physics.basic.RotationDirection.from(power.getDirection()));
+                dev.sdm.torque_foundry.physics.RotationDirection.from(power.getDirection()));
     }
 
     private static String formatDirections(Direction[] directions) {

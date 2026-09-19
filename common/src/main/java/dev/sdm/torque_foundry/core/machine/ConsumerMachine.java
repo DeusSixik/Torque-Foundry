@@ -1,8 +1,8 @@
-﻿package dev.sdm.torque_foundry.core.machine;
+package dev.sdm.torque_foundry.core.machine;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.RotationDirection;
 import net.minecraft.core.Direction;
 
 /**
@@ -12,7 +12,7 @@ import net.minecraft.core.Direction;
 public class ConsumerMachine extends MechanicalMachine {
 
     public ConsumerMachine(long requiredSpeedRaw, long requiredTorqueRaw, RotationDirection direction) {
-        super(MechanicalPower.fromRaw(requiredSpeedRaw, requiredTorqueRaw, direction),
+        super(RotationalPower.fromRaw(requiredSpeedRaw, requiredTorqueRaw, direction),
                 direction == null ? (byte) -1 : direction.index);
     }
 

@@ -1,8 +1,8 @@
-﻿package dev.sdm.torque_foundry.core.machine;
+package dev.sdm.torque_foundry.core.machine;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.RotationDirection;
 import net.minecraft.core.Direction;
 
 /**
@@ -11,15 +11,15 @@ import net.minecraft.core.Direction;
  */
 public class GeneratorMachine extends MechanicalMachine {
 
-    private final MechanicalPower output;
+    private final RotationalPower output;
 
     public GeneratorMachine(long outputSpeedRaw, long outputTorqueRaw, RotationDirection direction) {
-        super(MechanicalPower.fromRaw(0, 0), (byte) -1);
-        this.output = MechanicalPower.fromRaw(outputSpeedRaw, outputTorqueRaw, direction);
+        super(RotationalPower.fromRaw(0, 0), (byte) -1);
+        this.output = RotationalPower.fromRaw(outputSpeedRaw, outputTorqueRaw, direction);
     }
 
     @Override
-    public MechanicalPower getOutput() {
+    public RotationalPower getOutput() {
         return output;
     }
 

@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.physics.basic;
+package dev.sdm.torque_foundry.physics.material;
 
 /**
  * Пресеты материалов механических деталей.
@@ -11,33 +11,33 @@ package dev.sdm.torque_foundry.physics.basic;
  * <p>Дерево — дешёвое, лёгкое, тихое, но хрупкое и низкооборотное.
  * Сталь — жёсткое, прочное, высокооборотное.
  */
-public final class MachineMaterials {
+public final class PhysicsMaterials {
 
     /**
      * Дуб вдоль волокон: лёгкий, «мягкий», анизотропный (G кручения задан явно).
      */
-    public static final MachineMaterial WOOD = MachineMaterial.Builder.wood("Wood").build();
+    public static final PhysicsMaterial WOOD = PhysicsMaterial.Builder.wood("Wood").build();
 
     /**
      * Бронза: тяжёлая, пластичная, низкое трение по стали (подшипники).
      */
-    public static final MachineMaterial BRONZE = MachineMaterial.Builder.bronze("Bronze").build();
+    public static final PhysicsMaterial BRONZE = PhysicsMaterial.Builder.bronze("Bronze").build();
 
     /**
      * Серый чугун: хрупкий, демпфирует вибрации.
      */
-    public static final MachineMaterial IRON = MachineMaterial.Builder.castIron("Iron").build();
+    public static final PhysicsMaterial IRON = PhysicsMaterial.Builder.castIron("Iron").build();
 
     /**
      * Конструкционная сталь: жёсткая, прочная, материал передач.
      */
-    public static final MachineMaterial STEEL = MachineMaterial.Builder.steel("Steel").build();
+    public static final PhysicsMaterial STEEL = PhysicsMaterial.Builder.steel("Steel").build();
 
     /**
      * Материал по умолчанию.
      */
-    public static final MachineMaterial DEFAULT = IRON;
+    public static final PhysicsMaterial DEFAULT = IRON;
 
-    private MachineMaterials() {
+    private PhysicsMaterials() {
     }
 }

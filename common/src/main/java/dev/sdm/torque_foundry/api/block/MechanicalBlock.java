@@ -2,7 +2,7 @@ package dev.sdm.torque_foundry.api.block;
 
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.core.network.TFNetworking;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -17,14 +17,14 @@ import org.jetbrains.annotations.Nullable;
 
 public abstract class MechanicalBlock extends BaseEntityBlock {
 
-    protected final MechanicalPower power;
+    protected final RotationalPower power;
 
-    public MechanicalBlock(MechanicalPower power, Properties properties) {
+    public MechanicalBlock(RotationalPower power, Properties properties) {
         super(properties);
         this.power = power;
     }
 
-    public MechanicalPower getPower() {
+    public RotationalPower getPower() {
         return power;
     }
 
@@ -32,8 +32,8 @@ public abstract class MechanicalBlock extends BaseEntityBlock {
      * Физический материал машины для этого blockstate (по умолчанию — железо).
      * Переопределяется блоками со свойством MATERIAL (вал).
      */
-    public dev.sdm.torque_foundry.physics.basic.MachineMaterial materialOf(BlockState state) {
-        return dev.sdm.torque_foundry.physics.basic.MachineMaterials.DEFAULT;
+    public dev.sdm.torque_foundry.physics.material.PhysicsMaterial materialOf(BlockState state) {
+        return dev.sdm.torque_foundry.physics.material.PhysicsMaterials.DEFAULT;
     }
 
     @Override

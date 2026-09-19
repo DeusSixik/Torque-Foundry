@@ -1,6 +1,9 @@
-package dev.sdm.torque_foundry.physics.basic;
+package dev.sdm.torque_foundry.physics.machine;
 
-public class MechanicalGearbox {
+import dev.sdm.torque_foundry.physics.RotationDirection;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+
+public class GearRatio {
 
     private final int ratio;
     private final boolean stepUp;   // true = ↑speed ↓torque, false = ↓speed ↑torque
@@ -9,13 +12,13 @@ public class MechanicalGearbox {
     // "долг" по скорости — копится между тиками, чтобы деление было без потерь
     private long remainder = 0;
 
-    public MechanicalGearbox(int ratio, boolean stepUp, boolean reverses) {
+    public GearRatio(int ratio, boolean stepUp, boolean reverses) {
         this.ratio = ratio;
         this.stepUp = stepUp;
         this.reverses = reverses;
     }
 
-    public MechanicalPower transform(MechanicalPower input) {
+    public RotationalPower transform(RotationalPower input) {
         long outSpeedRaw;
         long outTorqueRaw;
 
@@ -35,6 +38,6 @@ public class MechanicalGearbox {
                 ? RotationDirection.opposite(input.getDirection())
                 : input.getDirection();
 
-        return MechanicalPower.fromRaw(outSpeedRaw, outTorqueRaw, outDirection);
+        return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, outDirection);
     }
 }

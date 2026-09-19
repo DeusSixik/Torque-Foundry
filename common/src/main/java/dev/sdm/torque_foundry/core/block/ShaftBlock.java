@@ -4,7 +4,7 @@ import com.mojang.serialization.MapCodec;
 import dev.sdm.torque_foundry.api.block.MechanicalBlock;
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.RotationalPower;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -49,7 +49,7 @@ public class ShaftBlock extends MechanicalBlock {
     public static final EnumProperty<ShaftMaterial> MATERIAL = EnumProperty.create("material", ShaftMaterial.class);
 
     public ShaftBlock(Properties properties) {
-        super(MechanicalPower.from(0, 0), properties);
+        super(RotationalPower.from(0, 0), properties);
         this.registerDefaultState(this.stateDefinition.any()
                 .setValue(AXIS, Direction.Axis.Y)
                 .setValue(CEILING, false)
@@ -121,7 +121,7 @@ public class ShaftBlock extends MechanicalBlock {
     }
 
     @Override
-    public dev.sdm.torque_foundry.physics.basic.MachineMaterial materialOf(BlockState state) {
+    public dev.sdm.torque_foundry.physics.material.PhysicsMaterial materialOf(BlockState state) {
         return state.getValue(MATERIAL).machine;
     }
 

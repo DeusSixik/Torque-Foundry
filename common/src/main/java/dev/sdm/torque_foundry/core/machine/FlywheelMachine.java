@@ -1,8 +1,8 @@
 package dev.sdm.torque_foundry.core.machine;
 
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine.PortRole;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine.PortRole;
 import net.minecraft.core.Direction;
 
 /**
@@ -36,7 +36,7 @@ public class FlywheelMachine extends MechanicalMachine {
 
     public FlywheelMachine(double capacityJoules, double efficiency, long ratedTorqueRaw,
                            Direction inputSide, Direction outputSide) {
-        super(MechanicalPower.fromRaw(0, 0), (byte) -1);
+        super(RotationalPower.fromRaw(0, 0), (byte) -1);
         this.capacity = Math.max(1.0, capacityJoules);
         this.efficiency = Math.max(0.1, Math.min(1.0, efficiency));
         this.ratedTorqueRaw = ratedTorqueRaw;
@@ -82,7 +82,7 @@ public class FlywheelMachine extends MechanicalMachine {
      * разница покрывается из запаса (пока хватает энергии).
      */
     @Override
-    public MechanicalPower transform(MechanicalPower input, Direction outputSide) {
+    public RotationalPower transform(RotationalPower input, Direction outputSide) {
         if (outputSide != this.outputSide) {
             return input;
         }
@@ -100,7 +100,7 @@ public class FlywheelMachine extends MechanicalMachine {
         // Биллинг произойдёт в onNetworkTick (дети получат буст ->
         // childrenWatts - receivedWatts = расход маховика за тик).
         final long newTorque = Math.min(ratedTorqueRaw, Math.max(torque, ratedTorqueRaw));
-        return MechanicalPower.fromRaw(speed, newTorque, input.getDirection());
+        return RotationalPower.fromRaw(speed, newTorque, input.getDirection());
     }
 
     /**

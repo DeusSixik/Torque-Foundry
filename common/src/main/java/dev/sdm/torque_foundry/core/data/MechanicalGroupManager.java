@@ -1,8 +1,8 @@
-﻿package dev.sdm.torque_foundry.core.data;
+package dev.sdm.torque_foundry.core.data;
 
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
 import dev.sdm.torque_foundry.api.collections.CustomLong2ObjectOpenHashMap;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;

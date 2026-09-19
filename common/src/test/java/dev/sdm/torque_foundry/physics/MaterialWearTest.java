@@ -2,9 +2,9 @@ package dev.sdm.torque_foundry.physics;
 
 import dev.sdm.torque_foundry.core.machine.GeneratorMachine;
 import dev.sdm.torque_foundry.core.machine.ShaftMachine;
-import dev.sdm.torque_foundry.physics.basic.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.basic.MachineMaterials;
-import dev.sdm.torque_foundry.physics.basic.RotationDirection;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.material.PhysicsMaterials;
+import dev.sdm.torque_foundry.physics.RotationDirection;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ public class MaterialWearTest {
     void ironShafts_noWearAtSafeSpeed() {
         // Железо: лимит 256 RPM = обороты генератора -> износа нет
         final MechanicalGroup group = chainOf(
-                MachineMaterials.IRON, MachineMaterials.IRON, MachineMaterials.IRON);
+                PhysicsMaterials.IRON, PhysicsMaterials.IRON, PhysicsMaterials.IRON);
 
         for (int t = 0; t < 200; t++) {
             group.computeTick();
@@ -42,7 +42,7 @@ public class MaterialWearTest {
     void woodShafts_wearAtHighSpeed() {
         // Дерево: лимит 120 RPM < обороты генератора 256 RPM -> износ
         final MechanicalGroup group = chainOf(
-                MachineMaterials.WOOD, MachineMaterials.WOOD, MachineMaterials.WOOD);
+                PhysicsMaterials.WOOD, PhysicsMaterials.WOOD, PhysicsMaterials.WOOD);
 
         for (int t = 0; t < 200; t++) {
             group.computeTick();
@@ -58,7 +58,7 @@ public class MaterialWearTest {
     void steelChain_noWearEvenAbove() {
         // Сталь: лимит 400 RPM, генератор 256 — запас огромный
         final MechanicalGroup group = chainOf(
-                MachineMaterials.STEEL, MachineMaterials.STEEL, MachineMaterials.STEEL);
+                PhysicsMaterials.STEEL, PhysicsMaterials.STEEL, PhysicsMaterials.STEEL);
 
         for (int t = 0; t < 200; t++) {
             group.computeTick();
@@ -70,9 +70,9 @@ public class MaterialWearTest {
 
     // --- хелперы ---
 
-    private MechanicalGroup chainOf(dev.sdm.torque_foundry.physics.basic.MachineMaterial m0,
-                                    dev.sdm.torque_foundry.physics.basic.MachineMaterial m1,
-                                    dev.sdm.torque_foundry.physics.basic.MachineMaterial m2) {
+    private MechanicalGroup chainOf(dev.sdm.torque_foundry.physics.material.PhysicsMaterial m0,
+                                    dev.sdm.torque_foundry.physics.material.PhysicsMaterial m1,
+                                    dev.sdm.torque_foundry.physics.material.PhysicsMaterial m2) {
         final MechanicalGroup group = new MechanicalGroup();
         final MechanicalMachine gen = new GeneratorMachine(GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD);
         gen.setBlockPos(new BlockPos(0, 0, 0));

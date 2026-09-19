@@ -3,7 +3,7 @@ package dev.sdm.torque_foundry.core.block;
 import com.mojang.serialization.MapCodec;
 import dev.sdm.torque_foundry.api.block.MechanicalBlock;
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
-import dev.sdm.torque_foundry.physics.basic.MechanicalPower;
+import dev.sdm.torque_foundry.physics.RotationalPower;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -17,12 +17,12 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public class ConsumerBlock extends MechanicalBlock {
 
-    public static final MechanicalPower DEFAULT_REQUIRED = MechanicalPower.from(64, 32);
+    public static final RotationalPower DEFAULT_REQUIRED = RotationalPower.from(64, 32);
 
     public static final MapCodec<ConsumerBlock> CODEC = simpleCodec(
             properties -> new ConsumerBlock(properties, DEFAULT_REQUIRED));
 
-    public ConsumerBlock(Properties properties, MechanicalPower requiredPower) {
+    public ConsumerBlock(Properties properties, RotationalPower requiredPower) {
         super(requiredPower, properties);
     }
 
