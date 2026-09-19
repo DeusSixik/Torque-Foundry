@@ -74,6 +74,25 @@ public class MechanicalMachine {
     private final SimulationState simulationState = new SimulationState();
 
     /**
+     * Опорные точки (подшипники) машины. У осевых машин (вал) их две —
+     * торцы по оси; у остальных машин слоты неактивны и на физику
+     * не влияют.
+     */
+    private final Bearing[] bearings = {new Bearing(), new Bearing()};
+
+    /** Резервуар смазки (общий на машину). */
+    private final LubricantState lubricant = new LubricantState();
+
+    /**
+     * Перекос/дисбаланс вала, градусы (из тира Grade при крафте).
+     * Множители трения и износа: 1 + перекос × 0.5 / 1 + перекос.
+     */
+    private double misalignmentDeg = 0.0;
+
+    /** Есть ли активные опорные точки (осевая машина). */
+    private boolean bearingSlots = false;
+
+    /**
      * Локальные порты машины (в системе координат блока при повороте 0).
      * Заполняется в {@link #createDirections()} через {@link #port}.
      * Мировые направления получаются поворотом по {@link #facing}.
@@ -276,9 +295,10 @@ public class MechanicalMachine {
     }
 
     /**
-     * Симуляционный тик машины: нагрев трением + пассивное охлаждение.
-     * Вызывается конвейером в фазе динамики для всех вращающихся машин.
-     * Переопределяется для своей теплофизики (печи, тормоза и т.п.).
+     * Симуляционный тик машины: нагрев трением + пассивное охлаждение,
+     * износ подшипников, расход смазки. Вызывается конвейером в фазе
+     * динамики для всех вращающихся машин. Переопределяется для своей
+     * теплофизики (печи, тормоза и т.п.).
      *
      * @param frictionTorqueMilliNm момент трения этой машины, milli-Nm
      * @param speedMilliRpm         обороты, milli-RPM
@@ -287,6 +307,22 @@ public class MechanicalMachine {
         final double massKg = material.nominalMassKg();
         simulationState.addFrictionHeat(frictionTorqueMilliNm, speedMilliRpm);
         simulationState.coolTick(material, massKg);
+
+        // Износ опор + расход смазки (только осевые машины со слотами)
+        if (bearingSlots) {
+            final double wf = wearFactor();
+            bearings[0].wearTick(speedMilliRpm, wf);
+            bearings[1].wearTick(speedMilliRpm, wf);
+
+            int lubricatedCount = 0;
+            for (Bearing b : bearings) {
+                // Закрытый шариковый смазки не требует
+                if (b.present() && b.type() != BearingType.BALL) {
+                    lubricatedCount++;
+                }
+            }
+            lubricant.consumeTick(speedMilliRpm, 1.0, lubricatedCount);
+        }
     }
 
     public boolean isPassive() {
@@ -344,11 +380,100 @@ public class MechanicalMachine {
 
     /**
      * Момент трения машины при заданных оборотах (milli-Nm):
-     * вязкое трение из реального коэффициента μ. Минимум 1 milli-Nm —
+     * вязкое трение из реального коэффициента μ с множителями опор
+     * (подшипники, сухой ход, перекос). Минимум 1 milli-Nm —
      * чтобы сеть всегда останавливалась трением.
      */
     public long getFrictionTorque(long speedRaw) {
-        return PhysicsMath.viscousFrictionTorque(material.viscousFriction(), speedRaw);
+        return PhysicsMath.viscousFrictionTorque(
+                material.viscousFriction() * frictionMultiplier(speedRaw), speedRaw);
+    }
+
+    /**
+     * Множитель трения узла от опор и перекоса: произведение множителей
+     * опорных точек × перекос. Без активных слотов — только перекос.
+     */
+    public double frictionMultiplier(long speedRaw) {
+        double m = 1.0;
+        if (bearingSlots) {
+            final boolean lubed = lubricant.available();
+            for (Bearing b : bearings) {
+                m *= b.frictionMultiplier(lubed);
+            }
+        }
+        // Перекос: дисбаланс мешает вращению
+        m *= 1.0 + misalignmentDeg * 0.5;
+        return m;
+    }
+
+    /**
+     * Множитель износа узла (подшипники): перекос ускоряет,
+     * сухой ход ускоряет втрое — но только опорам, требующим смазки.
+     */
+    public double wearFactor() {
+        double w = 1.0 + misalignmentDeg;
+        if (bearingSlots && !lubricant.available()) {
+            boolean anyNeedsLube = false;
+            for (Bearing b : bearings) {
+                if (b.needsLubrication()) {
+                    anyNeedsLube = true;
+                    break;
+                }
+            }
+            if (anyNeedsLube) {
+                w *= 3.0; // на сухую износ втрое быстрее
+            }
+        }
+        return w;
+    }
+
+    // --- Опоры и смазка ---
+
+    /** Активирует опорные слоты (осевая машина: вал). */
+    protected void enableBearingSlots() {
+        this.bearingSlots = true;
+    }
+
+    public boolean hasBearingSlots() {
+        return bearingSlots;
+    }
+
+    public Bearing getBearing(int slot) {
+        return bearings[slot];
+    }
+
+    /** Установить подшипник в точку (ПКМ предметом). */
+    public void installBearing(int slot, BearingType type) {
+        bearings[slot].install(type);
+    }
+
+    /** Снять подшипник ключом. Возвращает снятый тип (для выпадения). */
+    public BearingType removeBearing(int slot) {
+        final BearingType t = bearings[slot].type();
+        bearings[slot].remove();
+        return t;
+    }
+
+    /** Сломанный подшипник: точка опустела сама (для дропа обломков). */
+    public BearingType pollBrokenBearing(int slot) {
+        if (bearings[slot].broken()) {
+            final BearingType t = bearings[slot].type();
+            bearings[slot].remove();
+            return t;
+        }
+        return BearingType.NONE;
+    }
+
+    public LubricantState getLubricant() {
+        return lubricant;
+    }
+
+    public double getMisalignmentDeg() {
+        return misalignmentDeg;
+    }
+
+    public void setMisalignmentDeg(double deg) {
+        this.misalignmentDeg = Math.max(0, deg);
     }
 
     public Direction getFacing() {

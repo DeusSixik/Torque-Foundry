@@ -2,5 +2,31 @@
   "block.torque_foundry.generator": "Generator",
   "block.torque_foundry.shaft": "Shaft",
   "block.torque_foundry.consumer": "Consumer",
+  "block.torque_foundry.chassis": "Gearbox Chassis",
+
+  "item.torque_foundry.bearing_sleeve": "Sleeve Bearing",
+  "item.torque_foundry.bearing_roller": "Roller Bearing",
+  "item.torque_foundry.bearing_ball": "Sealed Ball Bearing",
+  "item.torque_foundry.lubricant_grease": "Grease",
+  "item.torque_foundry.lubricant_oil": "Mineral Oil",
+  "item.torque_foundry.wrench": "Wrench",
+  "item.torque_foundry.gear": "Gear",
+
+  "item.torque_foundry.shaft.grade": "Balance: Grade %s (+%s\u00B0 misalignment)",
+  "item.torque_foundry.gear.teeth": "Teeth: %s (drive %s) | Ratio %s",
+  "item.torque_foundry.gear.material": "Material: %s",
+  "item.torque_foundry.gear.rating": "Rated: %s Nm, %s RPM",
+  "item.torque_foundry.chassis.status": "Gear: %s teeth | Ratio %s | Material: %s",
+  "item.torque_foundry.chassis.empty": "Chassis is empty (insert a gear)",
+  "item.torque_foundry.chassis.gear_taken": "Gear removed",
+  "item.torque_foundry.chassis.gear_installed": "Gear installed: %s teeth",
+  "item.torque_foundry.chassis.gear_returned": "Old gear returned to inventory",
+
+  "message.torque_foundry.shaft_material": "Shaft material: %s",
+  "message.torque_foundry.shaft_status": "Group: %s | Misalign: +%s\u00B0 | Bearings: %s (%s%% worn) / %s (%s%% worn) | Lube: %s/%s %s",
+  "message.torque_foundry.bearing_installed": "Bearing installed: %s (slot %s)",
+  "message.torque_foundry.bearing_removed": "Bearing removed",
+  "message.torque_foundry.lubricated": "Lubricated: %s",
+
   "itemGroup.torque_foundry.main": "Torque Foundry"
 }

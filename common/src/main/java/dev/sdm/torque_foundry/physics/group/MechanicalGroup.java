@@ -147,6 +147,9 @@ public class MechanicalGroup {
     }
 
     public MechanicalMachine getMachine(int index) {
+        if (index < 0 || index >= size) {
+            return null;
+        }
         return machines[index];
     }
 

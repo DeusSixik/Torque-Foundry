@@ -4,14 +4,23 @@ import com.mojang.serialization.MapCodec;
 import dev.sdm.torque_foundry.api.block.MechanicalBlock;
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
+import dev.sdm.torque_foundry.core.item.TFItems;
 import dev.sdm.torque_foundry.physics.RotationalPower;
+import dev.sdm.torque_foundry.physics.machine.BearingType;
+import dev.sdm.torque_foundry.physics.machine.LubricantState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.LivingEntity;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Mirror;
@@ -139,6 +148,15 @@ public class ShaftBlock extends MechanicalBlock {
     }
 
     @Override
+    public void setPlacedBy(Level level, BlockPos blockPos, BlockState blockState, @Nullable LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, blockPos, blockState, placer, stack);
+        // Тир балансировки предмета -> перекос машины (Grade C..S)
+        if (!level.isClientSide && level.getBlockEntity(blockPos) instanceof ShaftBlockEntity be) {
+            be.machine.setMisalignmentDeg(dev.sdm.torque_foundry.core.item.ShaftItem.gradeOf(stack).misalignmentDeg());
+        }
+    }
+
+    @Override
     protected InteractionResult useWithoutItem(BlockState blockState, Level level, BlockPos blockPos, Player player, BlockHitResult blockHitResult) {
         final MechanicalBlockEntity be = (MechanicalBlockEntity) level.getBlockEntity(blockPos);
 
@@ -151,13 +169,95 @@ public class ShaftBlock extends MechanicalBlock {
                 if (be != null) {
                     be.machine.setMaterial(next.machine);
                 }
-                player.displayClientMessage(Component.literal(
-                        "Shaft material: " + next.getSerializedName()), true);
+                player.displayClientMessage(Component.translatable(
+                        "message.torque_foundry.shaft_material", next.getSerializedName()), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
 
-        player.displayClientMessage(Component.literal("" + be.machine.getGroupIndex()), false);
+        // Статус узла: группа, перекос, опоры, смазка
+        if (be != null && !level.isClientSide) {
+            final dev.sdm.torque_foundry.physics.machine.Bearing a = be.machine.getBearing(0);
+            final dev.sdm.torque_foundry.physics.machine.Bearing b = be.machine.getBearing(1);
+            final LubricantState lube = be.machine.getLubricant();
+            player.displayClientMessage(Component.translatable(
+                    "message.torque_foundry.shaft_status",
+                    be.machine.getGroupIndex(),
+                    be.machine.getMisalignmentDeg(),
+                    a.type(), Math.round(a.wear() * 100),
+                    b.type(), Math.round(b.wear() * 100),
+                    Math.round(lube.amount()), (int) LubricantState.CAPACITY, lube.type()), false);
+        }
         return super.useWithoutItem(blockState, level, blockPos, player, blockHitResult);
+    }
+
+    /**
+     * ПКМ предметом по валу:
+     * - подшипник в торец (клик по осевой грани вала)
+     * - смазка в резервуар
+     * - гаечный ключ: снять подшипник с кликнутого торца
+     */
+    @Override
+    protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
+                                              Player player, InteractionHand hand, BlockHitResult hit) {
+        final MechanicalBlockEntity be = (MechanicalBlockEntity) level.getBlockEntity(pos);
+        if (be == null || !be.machine.hasBearingSlots()) {
+            return super.useItemOn(stack, state, level, pos, player, hand, hit);
+        }
+
+        // Подшипник: только по осевой (торцевой) грани вала
+        final BearingType bearing = TFItems.bearingOf(stack.getItem());
+        if (bearing != null) {
+            final Direction face = hit.getDirection();
+            if (face.getAxis() != state.getValue(AXIS)) {
+                return super.useItemOn(stack, state, level, pos, player, hand, hit);
+            }
+            if (!level.isClientSide) {
+                final int slot = bearingSlotFor(face, state.getValue(AXIS));
+                // Отказавшая опора уже опустела — ставим поверх свободно
+                be.machine.installBearing(slot, bearing);
+                stack.consume(1, player);
+                player.displayClientMessage(Component.translatable(
+                        "message.torque_foundry.bearing_installed", bearing, slot), true);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        // Смазка: в резервуар машины
+        final LubricantState.Type lube = TFItems.lubricantOf(stack.getItem());
+        if (lube != null && !level.isClientSide) {
+            // Один предмет заполняет весь резервуар (упрощение первой итерации)
+            be.machine.getLubricant().fill(lube, LubricantState.CAPACITY);
+            stack.consume(1, player);
+            player.displayClientMessage(Component.translatable(
+                    "message.torque_foundry.lubricated", lube), true);
+            return ItemInteractionResult.sidedSuccess(false);
+        }
+
+        // Гаечный ключ: снять подшипник с кликнутого торца
+        if (stack.getItem() == TFItems.WRENCH.get()) {
+            final Direction face = hit.getDirection();
+            if (face.getAxis() == state.getValue(AXIS) && !level.isClientSide) {
+                final int slot = bearingSlotFor(face, state.getValue(AXIS));
+                final BearingType removed = be.machine.removeBearing(slot);
+                if (removed != BearingType.NONE) {
+                    final Item back = TFItems.itemOf(removed);
+                    if (back != null) {
+                        player.getInventory().placeItemBackInInventory(new ItemStack(back));
+                    }
+                    player.displayClientMessage(Component.translatable(
+                            "message.torque_foundry.bearing_removed"), true);
+                }
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        return super.useItemOn(stack, state, level, pos, player, hand, hit);
+    }
+
+    /** Слот опоры по торцу: положительный конец оси = 0, отрицательный = 1. */
+    private static int bearingSlotFor(Direction face, Direction.Axis axis) {
+        final Direction positive = Direction.fromAxisAndDirection(axis, Direction.AxisDirection.POSITIVE);
+        return face == positive ? 0 : 1;
     }
 }

@@ -2,5 +2,31 @@
   "block.torque_foundry.generator": "Генератор",
   "block.torque_foundry.shaft": "Вал",
   "block.torque_foundry.consumer": "Потребитель",
+  "block.torque_foundry.chassis": "Корпус коробки",
+
+  "item.torque_foundry.bearing_sleeve": "Втулка",
+  "item.torque_foundry.bearing_roller": "Роликовый подшипник",
+  "item.torque_foundry.bearing_ball": "Закрытый шарикоподшипник",
+  "item.torque_foundry.lubricant_grease": "Пластичная смазка",
+  "item.torque_foundry.lubricant_oil": "Минеральное масло",
+  "item.torque_foundry.wrench": "Гаечный ключ",
+  "item.torque_foundry.gear": "Шестерня",
+
+  "item.torque_foundry.shaft.grade": "Балансировка: Grade %s (+%s\u00B0 перекоса)",
+  "item.torque_foundry.gear.teeth": "Зубья: %s (привод %s) | Число %s",
+  "item.torque_foundry.gear.material": "Материал: %s",
+  "item.torque_foundry.gear.rating": "Рейтинг: %s Нм, %s об/мин",
+  "item.torque_foundry.chassis.status": "Шестерня: %s зуб. | Число %s | Материал: %s",
+  "item.torque_foundry.chassis.empty": "Шасси пусто (вставьте шестерню)",
+  "item.torque_foundry.chassis.gear_taken": "Шестерня извлечена",
+  "item.torque_foundry.chassis.gear_installed": "Шестерня установлена: %s зуб.",
+  "item.torque_foundry.chassis.gear_returned": "Старая шестерня в инвентаре",
+
+  "message.torque_foundry.shaft_material": "Материал вала: %s",
+  "message.torque_foundry.shaft_status": "Группа: %s | Перекос: +%s\u00B0 | Опоры: %s (%s%% износ) / %s (%s%% износ) | Смазка: %s/%s %s",
+  "message.torque_foundry.bearing_installed": "Подшипник установлен: %s (точка %s)",
+  "message.torque_foundry.bearing_removed": "Подшипник снят",
+  "message.torque_foundry.lubricated": "Смазано: %s",
+
   "itemGroup.torque_foundry.main": "Torque Foundry"
 }

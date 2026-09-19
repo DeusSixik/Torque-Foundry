@@ -5,6 +5,8 @@ import dev.architectury.platform.Platform;
 import dev.sdm.torque_foundry.core.block.TFBlockEntities;
 import dev.sdm.torque_foundry.core.block.TFBlocks;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupEvents;
+import dev.sdm.torque_foundry.core.item.TFComponents;
+import dev.sdm.torque_foundry.core.item.TFItems;
 import dev.sdm.torque_foundry.core.network.TFNetworking;
 import dev.sdm.torque_foundry.debug.physics.DebugRegisters;
 import net.fabricmc.api.EnvType;
@@ -18,7 +20,9 @@ public final class TorqueFoundry {
     public static void init() {
         // Write common init code here.
 
+        TFComponents.register();
         TFBlocks.register();
+        TFItems.register();
         TFBlockEntities.register();
         TFNetworking.register();
         MechanicalGroupEvents.register();

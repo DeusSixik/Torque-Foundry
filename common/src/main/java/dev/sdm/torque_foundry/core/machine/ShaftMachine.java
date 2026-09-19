@@ -16,6 +16,8 @@ public class ShaftMachine extends MechanicalMachine {
         super(RotationalPower.fromRaw(0, 0), (byte) -1);
         setPassive(true);
         applyAxisPorts();
+        // Вал держится в корпусе двумя опорными точками (торцы по оси)
+        enableBearingSlots();
     }
 
     @Override

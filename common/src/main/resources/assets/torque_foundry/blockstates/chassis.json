@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "torque_foundry:block/chassis", "y": 0 },
+    "facing=east":  { "model": "torque_foundry:block/chassis", "y": 90 },
+    "facing=south": { "model": "torque_foundry:block/chassis", "y": 180 },
+    "facing=west":  { "model": "torque_foundry:block/chassis", "y": 270 }
+  }
+}
