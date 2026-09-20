@@ -46,6 +46,7 @@ public final class DebugRegisters {
         BlockEntityRendererRegistry.register(TFBlockEntities.GENERATOR.get(), MechanicalRenderer::new);
         BlockEntityRendererRegistry.register(TFBlockEntities.CONSUMER.get(), MechanicalRenderer::new);
         BlockEntityRendererRegistry.register(TFBlockEntities.CHASSIS.get(), MechanicalRenderer::new);
+        BlockEntityRendererRegistry.register(TFBlockEntities.JUNCTION.get(), MechanicalRenderer::new);
         TorqueFoundry.LOGGER.info("Registered client renderers.");
     }
 

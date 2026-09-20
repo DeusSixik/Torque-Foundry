@@ -46,6 +46,11 @@ public final class TFBlocks {
             () -> new ChassisBlock(props())
     );
 
+    public static final RegistrySupplier<JunctionBlock> JUNCTION = BLOCKS.register(
+            id("junction"),
+            () -> new JunctionBlock(props())
+    );
+
     public static final RegistrySupplier<BlockItem> GENERATOR_ITEM = ITEMS.register(
             id("generator"), () -> new BlockItem(GENERATOR.get(), new Item.Properties())
     );
@@ -60,6 +65,10 @@ public final class TFBlocks {
 
     public static final RegistrySupplier<BlockItem> CHASSIS_ITEM = ITEMS.register(
             id("chassis"), () -> new BlockItem(CHASSIS.get(), new Item.Properties())
+    );
+
+    public static final RegistrySupplier<BlockItem> JUNCTION_ITEM = ITEMS.register(
+            id("junction"), () -> new BlockItem(JUNCTION.get(), new Item.Properties())
     );
 
     /**
@@ -82,6 +91,7 @@ public final class TFBlocks {
                         output.accept(dev.sdm.torque_foundry.core.item.TFItems.LUBRICANT_OIL.get());
                         output.accept(dev.sdm.torque_foundry.core.item.TFItems.WRENCH.get());
                         output.accept(CHASSIS_ITEM.get());
+                        output.accept(JUNCTION_ITEM.get());
                         output.accept(dev.sdm.torque_foundry.core.item.TFItems.GEAR.get());
                         output.accept(dev.sdm.torque_foundry.core.item.ShaftPartItem.create(
                                 dev.sdm.torque_foundry.physics.material.PhysicsMaterials.WOOD));

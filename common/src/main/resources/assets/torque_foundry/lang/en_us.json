@@ -3,6 +3,7 @@
   "block.torque_foundry.shaft": "Shaft",
   "block.torque_foundry.consumer": "Consumer",
   "block.torque_foundry.chassis": "Gearbox Chassis",
+  "block.torque_foundry.junction": "Shaft Junction",
 
   "item.torque_foundry.bearing_sleeve": "Sleeve Bearing",
   "item.torque_foundry.bearing_roller": "Roller Bearing",

@@ -87,7 +87,7 @@ public class PhysicsTick {
         }
     }
 
-    private static class PendingData {
+    protected static class PendingData {
         MechanicalGroup group;
         Result result;
     }

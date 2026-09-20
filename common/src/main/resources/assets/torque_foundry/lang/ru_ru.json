@@ -3,6 +3,7 @@
   "block.torque_foundry.shaft": "Вал",
   "block.torque_foundry.consumer": "Потребитель",
   "block.torque_foundry.chassis": "Корпус коробки",
+  "block.torque_foundry.junction": "Узел вала",
 
   "item.torque_foundry.bearing_sleeve": "Втулка",
   "item.torque_foundry.bearing_roller": "Роликовый подшипник",

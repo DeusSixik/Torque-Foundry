@@ -19,7 +19,9 @@ import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
  */
 public final class ShaftWearHook implements PhysicsHook {
 
-    /** Доля потери момента за ребро на единицу превышения (excess/safe). */
+    /**
+     * Доля потери момента за ребро на единицу превышения (excess/safe).
+     */
     private static final double WEAR_FACTOR = 0.01;
 
     @Override
