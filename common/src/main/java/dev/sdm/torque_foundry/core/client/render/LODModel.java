@@ -2,6 +2,8 @@ package dev.sdm.torque_foundry.core.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import dev.sdm.torque_foundry.api.uitls.FastutilLruCache;
+import dev.sdm.torque_foundry.core.client.models.DefaultModModels;
 import dev.sdm.torque_foundry.core.client.render.structs.Quad;
 import dev.sdm.torque_foundry.core.client.render.structs.Vertex;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -9,7 +11,6 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import com.mojang.math.Axis;
-import org.joml.Math;
 
 import java.util.List;
 
@@ -22,6 +23,15 @@ import java.util.List;
  * Куллинг: чем меньше объём геометрии узла, тем ближе надо стоять.
  */
 public class LODModel {
+
+    public static LODModel createDefault() {
+        return new LODModel(DefaultModModels.DEFAULT_TEXTURE);
+    }
+
+    /**
+     * Рендер кэш, для избежания постоянного создания {@link RenderType}
+     */
+    private static final FastutilLruCache<ResourceLocation, RenderType> RENDER_CACHE = new FastutilLruCache<>(128);
 
     protected final ResourceLocation texture;
     protected final Part root;
@@ -64,12 +74,28 @@ public class LODModel {
         poseStack.pushPose();
         part.applyTransform(poseStack, partialTick);
 
+        // Текстура узла: override (материал из PartTextures) или модели.
+        final ResourceLocation partTexture =
+                part.textureOverride != null ? part.textureOverride : texture;
+
         final LODBox[] partBoxes = part.selectBoxes(distanceSqr);
         if (partBoxes.length > 0) {
-            final VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityCutout(texture));
+
+
+            final VertexConsumer consumer = bufferSource.getBuffer(RENDER_CACHE.getOrCreate(partTexture,
+                    () -> RenderType.entityCutout(partTexture))
+            );
             for (int i = 0; i < partBoxes.length; i++) {
                 partBoxes[i].emit(poseStack, consumer, packedLight, packedOverlay);
             }
+        }
+
+        // Произвольные меши (glTF): квады напрямую, без LODBox-обёртки.
+        // Координаты уже в пикселях модели — скейл 1/16 общий для узла.
+        final Quad[] mesh = part.selectMesh(distanceSqr);
+        if (mesh != null && mesh.length > 0) {
+            final VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityCutout(partTexture));
+            Model.emitQuads(mesh, poseStack, consumer, packedLight, packedOverlay);
         }
 
         for (int i = 0; i < part.children.size(); i++) {
@@ -108,8 +134,24 @@ public class LODModel {
          */
         public double renderDistanceScalar = 1.0;
 
+        /**
+         * Текстура узла (null — текстура модели). Выставляется рендером
+         * по материалу машины (PartTextures): один блок — разные материалы
+         * крафта, разные текстуры.
+         */
+        public ResourceLocation textureOverride;
+
         private final List<LODBox> boxes = new ObjectArrayList<>();
         private final List<Part> children = new ObjectArrayList<>();
+
+        /**
+         * Произвольные меши (glTF): готовые квады, рендерятся как есть
+         * (без LOD-слияния — уровни задаются файлами LOD0/LOD1).
+         */
+        private final List<Quad[]> meshes = new ObjectArrayList<>();
+
+        /** Индекс активного меша (LOD-уровень glTF). */
+        private int meshLod;
 
         /**
          * Уровни детализации: от детального к простому.
@@ -141,6 +183,17 @@ public class LODModel {
             boxes.add(new LODBox(x, y, z, w, h, d, u, v, texW, texH));
             cachedDistanceSqr = -1;
             lodLevels.clear();
+            return this;
+        }
+
+        /**
+         * Произвольный меш (например, из glTF): готовые квады вместо боксов.
+         * LOD-куллинг по объёму bounding box квадов; LODGenerator.generate
+         * для таких узлов не применяется (уровни — из файлов LOD0/LOD1).
+         */
+        public Part mesh(Quad[] quads) {
+            meshes.add(quads);
+            cachedDistanceSqr = -1;
             return this;
         }
 
@@ -181,6 +234,38 @@ public class LODModel {
             return boxes.toArray(LODBox[]::new);
         }
 
+        /**
+         * Выбор glTF-меша по дистанции: meshes[0] — детальный (LOD0),
+         * дальше — по порогам как у боксов. Без мешей — null.
+         */
+        Quad[] selectMesh(double distanceSqr) {
+            if (meshes.isEmpty()) {
+                return null;
+            }
+            if (meshes.size() == 1) {
+                return meshes.get(0);
+            }
+            final double base = effectiveThresholdSqr();
+            for (int i = 0; i < meshes.size(); i++) {
+                if (distanceSqr <= base * Math.pow(4, i) * renderDistanceScalar) {
+                    return meshes.get(i);
+                }
+            }
+            return meshes.get(meshes.size() - 1);
+        }
+
+        /** Активный LOD-индекс glTF-меша (для отладки/оверлея). */
+        public void setMeshLod(int lod) {
+            this.meshLod = Math.max(0, lod);
+        }
+
+        /** Добавить LOD-уровень glTF-меша (порядок: LOD0, LOD1, ...). */
+        public Part addMeshLod(Quad[] quads) {
+            meshes.add(quads);
+            cachedDistanceSqr = -1;
+            return this;
+        }
+
         public Part setRenderDistanceScalar(double scalar) {
             this.renderDistanceScalar = scalar;
             this.cachedDistanceSqr = -1;
@@ -211,14 +296,14 @@ public class LODModel {
             // Узел-контейнер без геометрии (например, корень) не кулица сам —
             // видимость определяют его дети. Иначе пустой узел получает
             // порог 96 (объём 0) и обрубает всё поддерево на ~10 блоках.
-            if (boxes.isEmpty()) {
+            if (boxes.isEmpty() && meshes.isEmpty()) {
                 return true;
             }
             return effectiveThresholdSqr() >= distanceSqr;
         }
 
         private double calculateDistanceSqr() {
-            double maxVolume = 0;
+            double maxVolume = meshVolume();
             for (int i = 0; i < boxes.size(); i++) {
                 final double volume = boxes.get(i).volume();
                 if (volume > maxVolume) {
@@ -226,6 +311,46 @@ public class LODModel {
                 }
             }
             return distanceForVolume(maxVolume);
+        }
+
+        /** Объём bounding box glTF-мешей (для LOD-куллинга). */
+        private double meshVolume() {
+            if (meshes.isEmpty()) {
+                return 0;
+            }
+            float minX = Float.MAX_VALUE;
+            float minY = Float.MAX_VALUE;
+            float minZ = Float.MAX_VALUE;
+            float maxX = -Float.MAX_VALUE;
+            float maxY = -Float.MAX_VALUE;
+            float maxZ = -Float.MAX_VALUE;
+            boolean any = false;
+            for (int m = 0; m < meshes.size(); m++) {
+                final Quad[] quads = meshes.get(m);
+                for (int q = 0; q < quads.length; q++) {
+                    final Quad quad = quads[q];
+                    if (quad == null || quad.vertices == null) {
+                        continue;
+                    }
+                    for (int v = 0; v < quad.vertices.length; v++) {
+                        final var vtx = quad.vertices[v];
+                        if (vtx == null) {
+                            continue;
+                        }
+                        any = true;
+                        if (vtx.x < minX) minX = vtx.x;
+                        if (vtx.y < minY) minY = vtx.y;
+                        if (vtx.z < minZ) minZ = vtx.z;
+                        if (vtx.x > maxX) maxX = vtx.x;
+                        if (vtx.y > maxY) maxY = vtx.y;
+                        if (vtx.z > maxZ) maxZ = vtx.z;
+                    }
+                }
+            }
+            if (!any) {
+                return 0;
+            }
+            return (double) (maxX - minX) * (maxY - minY) * (maxZ - minZ);
         }
 
         static double distanceForVolume(double volume) {
