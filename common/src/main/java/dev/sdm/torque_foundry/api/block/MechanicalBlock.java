@@ -46,6 +46,8 @@ public abstract class MechanicalBlock extends BaseEntityBlock {
         super.setPlacedBy(level, blockPos, blockState, placer, stack);
 
         if (level.isClientSide) {
+            // Клиент: запускаем свечение портов после установки.
+            dev.sdm.torque_foundry.core.client.render.PortFaceOverlay.markPlaced(blockPos);
             return;
         }
 

@@ -114,7 +114,14 @@ public final class PhysicsPipeline {
                     }
                 }
             } catch (Throwable t) {
-                TorqueFoundry.LOGGER.error("Physics tick failed", t);
+                // Полный стек + состояние слотов: голый "ArithmeticException: null"
+                // без трейса не чинится (см. issue: деление на ноль в тике).
+                final StringBuilder groups = new StringBuilder();
+                for (int i = 0; i < physicsTicks.length; i++) {
+                    groups.append("#").append(i)
+                            .append(physicsTicks[i].isDone() ? "=done" : "=pending").append(' ');
+                }
+                TorqueFoundry.LOGGER.error("Physics tick failed [{}]", groups, t);
                 // слоты, не помеченные done, обязательна await-у повиснуть;
                 // принудительно завершаем слот при ошибке
                 for (int i = 0; i < physicsTicks.length; i++) {

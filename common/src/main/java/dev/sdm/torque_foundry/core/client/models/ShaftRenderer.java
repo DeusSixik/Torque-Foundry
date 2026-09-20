@@ -8,7 +8,6 @@ import dev.sdm.torque_foundry.core.client.render.LODGenerator;
 import dev.sdm.torque_foundry.core.client.render.LODModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -22,8 +21,11 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  *  - вертикальная (порт RotaryCraft ModelShaftV): клетка из 8 стоек с плитами,
  *    внутри крутится крест вокруг Y.
  * Ориентация берётся из свойства AXIS блока; CEILING переворачивает модель на потолок.
+ *
+ * <p>Подсветку портов (жёлтые торцы IN_OUT) дорисовывает базовый
+ * {@link MechanicalRenderer} — здесь только модель.
  */
-public class ShaftRenderer implements BlockEntityRenderer<ShaftBlockEntity> {
+public class ShaftRenderer extends MechanicalRenderer<ShaftBlockEntity> {
 
     public static final ResourceLocation TEXTURE =
             ResourceLocation.fromNamespaceAndPath("torque_foundry", "textures/block/shaft.png");
@@ -35,6 +37,7 @@ public class ShaftRenderer implements BlockEntityRenderer<ShaftBlockEntity> {
     private final LODModel.Part verticalShaft;
 
     public ShaftRenderer(BlockEntityRendererProvider.Context context) {
+        super(context);
         // --- Горизонтальный вал ---
         this.horizontalModel = new LODModel(TEXTURE);
         final int texW = 16, texH = 16;
@@ -85,8 +88,8 @@ public class ShaftRenderer implements BlockEntityRenderer<ShaftBlockEntity> {
     }
 
     @Override
-    public void render(ShaftBlockEntity blockEntity, float partialTick, PoseStack poseStack,
-                       MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+    protected void renderModel(ShaftBlockEntity blockEntity, float partialTick, PoseStack poseStack,
+                               MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
         // Позиция камеры относительно центра блока — для LOD-куллинга
         final var camPos = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         final var pos = blockEntity.getBlockPos();

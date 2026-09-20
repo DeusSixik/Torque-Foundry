@@ -783,7 +783,8 @@ public class MechanicalGroup {
                     final long lastSpeed = machine.getReceived().getSpeedRaw();
                     if (lastSpeed > 0) {
                         final long friction = machine.getFrictionTorque(lastSpeed);
-                        final long decel = PhysicsMath.accelStep(friction, (long) machine.getInertia());
+                        final long inertia = Math.max(1L, (long) machine.getInertia());
+                        final long decel = PhysicsMath.accelStep(friction, inertia);
                         final long coasted = Math.max(0, lastSpeed - decel);
                         machine.getReceived().setSpeedRaw(coasted);
                         machine.getReceived().setTorqueRaw(0);

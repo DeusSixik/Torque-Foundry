@@ -4,6 +4,7 @@ import dev.architectury.event.events.client.ClientLifecycleEvent;
 import dev.architectury.registry.client.rendering.BlockEntityRendererRegistry;
 import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.core.block.TFBlockEntities;
+import dev.sdm.torque_foundry.core.client.models.MechanicalRenderer;
 import dev.sdm.torque_foundry.core.client.models.ShaftRenderer;
 import foundry.imgui.api.ImGuiMCEvents;
 
@@ -42,6 +43,9 @@ public final class DebugRegisters {
      */
     public static void registerRenderers() {
         BlockEntityRendererRegistry.register(TFBlockEntities.SHAFT.get(), ShaftRenderer::new);
+        BlockEntityRendererRegistry.register(TFBlockEntities.GENERATOR.get(), MechanicalRenderer::new);
+        BlockEntityRendererRegistry.register(TFBlockEntities.CONSUMER.get(), MechanicalRenderer::new);
+        BlockEntityRendererRegistry.register(TFBlockEntities.CHASSIS.get(), MechanicalRenderer::new);
         TorqueFoundry.LOGGER.info("Registered client renderers.");
     }
 

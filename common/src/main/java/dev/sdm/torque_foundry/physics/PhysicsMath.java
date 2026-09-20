@@ -48,6 +48,11 @@ public final class PhysicsMath {
 
     /** Шаг изменения оборотов за тик: (τ · 477) / (I · 1000), минимум 1. */
     public static long accelStep(long torqueRaw, long inertia) {
+        if (inertia <= 0) {
+            // Нулевая/отрицательная инерция (машина без материала): сеть
+            // меняет скорость мгновенно, но деление на ноль запрещено.
+            return Math.max(1, Math.abs(torqueRaw));
+        }
         long delta = (torqueRaw * PhysicsConstants.ACCEL_NUM)
                 / (inertia * (PhysicsConstants.ACCEL_DEN / 1000));
         return delta == 0 ? 1 : delta;

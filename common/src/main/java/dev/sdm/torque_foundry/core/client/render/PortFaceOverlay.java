@@ -1,0 +1,450 @@
+package dev.sdm.torque_foundry.core.client.render;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import dev.sdm.torque_foundry.TorqueFoundry;
+import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
+import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+
+/**
+ * Подсветка сторон подключения (портов) механических блоков — порт
+ * RotaryCraft renderFaceColors: выступ-кубик INPUT заливается зелёным,
+ * OUTPUT — красным, проходной IN_OUT — жёлтым. Поверх — контур рёбер
+ * и луч от центра к грани, как в оригинале.
+ *
+ * <p>Кубик торчит из грани наружу (глубина {@link #PLUG_DEPTH}, сечение
+ * {@link #PLUG_SIZE}): направление порта читается объёмом, а не плоской
+ * заливкой. Показывается только когда игрок целится в механический блок
+ * И держит в руке предмет мода — иначе оверлей скрыт.
+ *
+ * <p>Рисуется в BER поверх модели: полупрозрачный объём чуть вынесен от грани
+ * (z-fighting нет), контур — RenderType.lines(). Ноль аллокаций на кадр
+ * кроме буферов ванильного батчинга.
+ */
+public final class PortFaceOverlay {
+
+    /**
+     * Вынос заливки от грани блока (против z-fighting с моделью).
+     */
+    private static final float FACE_EPS = 0.002F;
+
+    /**
+     * Вынос рамки-контура (чуть дальше заливки).
+     */
+    private static final float LINE_EPS = 0.004F;
+
+    /**
+     * Глубина выступа-кубика наружу от грани (в блоках).
+     */
+    private static final float PLUG_DEPTH = 0.25F;
+
+    /**
+     * Сечение выступа-кубика (доля грани, центрирован).
+     */
+    private static final float PLUG_SIZE = 0.5F;
+
+    /**
+     * Длина луча от центра к грани (в долях полублока).
+     */
+    private static final float BEAM_LEN = 2.6F;
+
+    /**
+     * Порядок Direction.values() фиксирован (DOWN UP NORTH SOUTH WEST EAST),
+     * но держим свой массив: values() клонирует массив при каждом вызове.
+     */
+    private static final Direction[] DIRS = {
+            Direction.DOWN, Direction.UP,
+            Direction.NORTH, Direction.SOUTH,
+            Direction.WEST, Direction.EAST};
+
+    // --- Статическая геометрия граней (CCW наружу, блок 0..1) ---
+    // Индекс = dir.ordinal() (совпадает с порядком DIRS). Ноль аллокаций в кадре.
+    // CORNERS больше не используются для заливки (выступ строится из PLUG_*),
+    // но оставлены для контура базовой грани? Нет — контур тоже по выступу.
+    // Таблицы удалены, геометрия выступа считается инлайном из нормали.
+
+    // --- Цвета портов (RotaryCraft): IN — зелёный, OUT — красный, IN_OUT — жёлтый ---
+
+    /**
+     * Бит стороны: 1 = IN, 2 = OUT (комбинация 3 = IN_OUT). 0 = глухая.
+     */
+    private static final int SIDE_IN = 1;
+    private static final int SIDE_OUT = 2;
+
+    /**
+     * Цвет по битам [r, g, b], индекс = комбинация SIDE_*.
+     */
+    private static final float[][] SIDE_COLORS = {
+            null, // NONE — не рисуется
+            {0.15F, 1.0F, 0.25F}, // IN — зелёный
+            {1.0F, 0.2F, 0.2F}, // OUT — красный
+            {1.0F, 0.85F, 0.1F}, // IN_OUT — жёлтый
+    };
+
+    /**
+     * Сколько тиков после установки светятся порты (5 секунд).
+     */
+    private static final long PLACEMENT_GLOW_TICKS = 100L;
+
+    /**
+     * pos.asLong() -> тик установки (игровое время клиента).
+     */
+    private static final Long2LongOpenHashMap PLACED_AT =
+            new Long2LongOpenHashMap();
+
+    static {
+        PLACED_AT.defaultReturnValue(-1L);
+    }
+
+    private PortFaceOverlay() {
+    }
+
+    /**
+     * Отметить блок свежепоставленным: порты светятся PLACEMENT_GLOW_TICKS
+     * тиков без прицела и предмета в руке. Вызывать из setPlacedBy блоков.
+     */
+    public static void markPlaced(net.minecraft.core.BlockPos pos) {
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
+            return;
+        }
+        PLACED_AT.put(pos.asLong(), minecraft.level.getGameTime());
+        // Карта живёт на клиенте: чистим протухшие записи при каждой установке.
+        if (PLACED_AT.size() > 512) {
+            final long now = minecraft.level.getGameTime();
+            PLACED_AT.keySet().removeIf(key -> now - PLACED_AT.get(key) > PLACEMENT_GLOW_TICKS);
+        }
+    }
+
+    /**
+     * Доля 1..0 свечения после установки (1 — только поставили, 0 — погас).
+     * 0 — не свежепоставленный.
+     */
+    public static float placementGlow(net.minecraft.core.BlockPos pos) {
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) {
+            return 0.0F;
+        }
+        final long placedAt = PLACED_AT.get(pos.asLong());
+        if (placedAt < 0) {
+            return 0.0F;
+        }
+        final long age = minecraft.level.getGameTime() - placedAt;
+        if (age < 0 || age >= PLACEMENT_GLOW_TICKS) {
+            PLACED_AT.remove(pos.asLong());
+            return 0.0F;
+        }
+        return 1.0F - age / (float) PLACEMENT_GLOW_TICKS;
+    }
+
+    /**
+     * Рисовать ли оверлей для этого BE: прицел на этот блок + предмет
+     * мода в любой руке, ИЛИ блок только что поставили (свечение гаснет
+     * само через PLACEMENT_GLOW_TICKS тиков).
+     */
+    public static boolean shouldRender(MechanicalBlockEntity be) {
+        if (placementGlow(be.getBlockPos()) > 0.0F) {
+            return true;
+        }
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.hitResult == null) {
+            return false;
+        }
+        if (minecraft.hitResult.getType() != HitResult.Type.BLOCK
+                || !(minecraft.hitResult instanceof BlockHitResult hit)) {
+            return false;
+        }
+        if (!hit.getBlockPos().equals(be.getBlockPos())) {
+            return false;
+        }
+        return holdsModItem(minecraft.player.getMainHandItem())
+                || holdsModItem(minecraft.player.getOffhandItem());
+    }
+
+    private static boolean holdsModItem(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        // Любой предмет мода: id из нашего namespace — новые блоки/инструменты
+        // подхватываются автоматически, список править не надо.
+        final var key = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        return key != null && TorqueFoundry.MOD_ID.equals(key.getNamespace());
+    }
+
+    /**
+     * Рендер всех портов машины. Пульсация альфы — как iotick в оригинале:
+     * яркость дышит от времени клиента.
+     *
+     * @param poseStack    локальный стек BER (0..1 координаты блока)
+     * @param bufferSource буферы кадра
+     * @param packedLight  освещение (для заливки берём fullbright — оверлей
+     *                     должен читаться и в темноте)
+     */
+    public static void render(MechanicalMachine machine, PoseStack poseStack,
+                              MultiBufferSource bufferSource, int packedLight) {
+        render(machine, machine.getBlockPos(), poseStack, bufferSource, packedLight);
+    }
+
+    /**
+     * Рендер всех портов машины. Пульсация альфы — как iotick в оригинале:
+     * яркость дышит от времени клиента; свежепоставленный блок дополнительно
+     * гаснет от 1 к 0 за PLACEMENT_GLOW_TICKS (множитель placementGlow).
+     */
+    public static void render(MechanicalMachine machine, net.minecraft.core.BlockPos pos,
+                              PoseStack poseStack,
+                              MultiBufferSource bufferSource, int packedLight) {
+        // Пульсация 0.55..1.0, период ~1.5 c — дышит, как iotick-альфа RC.
+        final float pulse = 0.55F + 0.45F
+                * (float) (0.5 + 0.5 * Math.sin(
+                Minecraft.getInstance().level.getGameTime() * 2.0 * Math.PI / 30.0));
+        // Свечение установки: яркий старт, линейное затухание. Без прицела
+        // (обычная установка) — просто pulse, с прицелом свечение не мешает.
+        final float glow = pos == null ? 0.0F : placementGlow(pos);
+        final float brightness = Math.min(1.0F, pulse + glow * 0.45F);
+
+        // Биты сторон собираем одним проходом (без аллокаций), дальше два
+        // прохода по статике: объём выступа + контур рёбер.
+        final int sides = sideBitsOf(machine);
+
+        final VertexConsumer fill = bufferSource.getBuffer(RenderType.debugQuads());
+        final int fillAlpha = (int) (90 * brightness);
+        final float fillA = fillAlpha / 255.0F;
+        final var pose = poseStack.last();
+        for (int d = 0; d < 6; d++) {
+            final int side = (sides >>> (d * 2)) & 3;
+            if (side == 0) {
+                continue;
+            }
+            final Direction dir = DIRS[d];
+            final float[] rgb = SIDE_COLORS[side];
+            emitPlug(dir, pose, fill, rgb[0], rgb[1], rgb[2], fillA);
+        }
+
+        final VertexConsumer lines = bufferSource.getBuffer(RenderType.lines());
+        final int lineAlpha = (int) (255 * brightness);
+        final float lineA = lineAlpha / 255.0F;
+        for (int d = 0; d < 6; d++) {
+            final int side = (sides >>> (d * 2)) & 3;
+            if (side == 0) {
+                continue;
+            }
+            final Direction dir = DIRS[d];
+            final float[] rgb = SIDE_COLORS[side];
+            emitPlugEdges(dir, pose, lines, rgb[0], rgb[1], rgb[2], lineA);
+            // Луч от центра блока к центру выступа (GL_LINES в оригинале).
+            final float nx = dir.getStepX();
+            final float ny = dir.getStepY();
+            final float nz = dir.getStepZ();
+            lines.addVertex(pose, 0.5F, 0.5F, 0.5F)
+                    .setColor(rgb[0], rgb[1], rgb[2], lineA)
+                    .setNormal(pose, nx, ny, nz);
+            lines.addVertex(pose,
+                            0.5F + nx * (0.5F + PLUG_DEPTH),
+                            0.5F + ny * (0.5F + PLUG_DEPTH),
+                            0.5F + nz * (0.5F + PLUG_DEPTH))
+                    .setColor(rgb[0], rgb[1], rgb[2], lineA)
+                    .setNormal(pose, nx, ny, nz);
+        }
+    }
+
+    /**
+     * Объём выступа-кубика: 6 граней (POSITION_COLOR, без нормали).
+     * Кубик строится от плоскости грани наружу: near = грань + EPS,
+     * far = грань + EPS + DEPTH по направлению нормали.
+     */
+    private static void emitPlug(Direction dir, PoseStack.Pose pose, VertexConsumer fill,
+                                 float r, float g, float b, float a) {
+        final float nx = dir.getStepX();
+        final float ny = dir.getStepY();
+        final float nz = dir.getStepZ();
+        final float half = PLUG_SIZE * 0.5F;
+
+        // Плоскость грани: 1 для +оси, 0 для -оси.
+        final float plane = (nx + ny + nz) > 0 ? 1.0F : 0.0F;
+        final float near = plane + (plane > 0.5F ? FACE_EPS : -FACE_EPS);
+        final float far = near + (nx + ny + nz) * PLUG_DEPTH;
+
+        // min/max упорядочены: lo = меньшее, hi = большее.
+        final float lo;
+        final float hi;
+        if (near < far) {
+            lo = near;
+            hi = far;
+        } else {
+            lo = far;
+            hi = near;
+        }
+
+        float minX;
+        float maxX;
+        float minY;
+        float maxY;
+        float minZ;
+        float maxZ;
+        if (nx != 0) {
+            minX = lo;
+            maxX = hi;
+            minY = 0.5F - half;
+            maxY = 0.5F + half;
+            minZ = 0.5F - half;
+            maxZ = 0.5F + half;
+        } else if (ny != 0) {
+            minX = 0.5F - half;
+            maxX = 0.5F + half;
+            minY = lo;
+            maxY = hi;
+            minZ = 0.5F - half;
+            maxZ = 0.5F + half;
+        } else {
+            minX = 0.5F - half;
+            maxX = 0.5F + half;
+            minY = 0.5F - half;
+            maxY = 0.5F + half;
+            minZ = lo;
+            maxZ = hi;
+        }
+        emitBox(pose, fill, minX, minY, minZ, maxX, maxY, maxZ, r, g, b, a);
+    }
+
+    /** Заливка бокса 6 гранями, CCW наружу (POSITION_COLOR). */
+    private static void emitBox(PoseStack.Pose pose, VertexConsumer fill,
+                                float x0, float y0, float z0,
+                                float x1, float y1, float z1,
+                                float r, float g, float b, float a) {
+        // DOWN (-Y)
+        quad(fill, pose, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, r, g, b, a);
+        // UP (+Y)
+        quad(fill, pose, x0, y1, z1, x1, y1, z1, x1, y1, z0, x0, y1, z0, r, g, b, a);
+        // NORTH (-Z)
+        quad(fill, pose, x0, y0, z0, x0, y1, z0, x1, y1, z0, x1, y0, z0, r, g, b, a);
+        // SOUTH (+Z)
+        quad(fill, pose, x1, y0, z1, x1, y1, z1, x0, y1, z1, x0, y0, z1, r, g, b, a);
+        // WEST (-X)
+        quad(fill, pose, x0, y0, z1, x0, y1, z1, x0, y1, z0, x0, y0, z0, r, g, b, a);
+        // EAST (+X)
+        quad(fill, pose, x1, y0, z0, x1, y1, z0, x1, y1, z1, x1, y0, z1, r, g, b, a);
+    }
+
+    private static void quad(VertexConsumer fill, PoseStack.Pose pose,
+                             float ax, float ay, float az,
+                             float bx, float by, float bz,
+                             float cx, float cy, float cz,
+                             float dx, float dy, float dz,
+                             float r, float g, float b, float a) {
+        fill.addVertex(pose, ax, ay, az).setColor(r, g, b, a);
+        fill.addVertex(pose, bx, by, bz).setColor(r, g, b, a);
+        fill.addVertex(pose, cx, cy, cz).setColor(r, g, b, a);
+        fill.addVertex(pose, dx, dy, dz).setColor(r, g, b, a);
+    }
+
+    /** Рёбра выступа-кубика: 12 рёбер бокса (POSITION_COLOR_NORMAL). */
+    private static void emitPlugEdges(Direction dir, PoseStack.Pose pose, VertexConsumer lines,
+                                      float r, float g, float b, float a) {
+        final float nx = dir.getStepX();
+        final float ny = dir.getStepY();
+        final float nz = dir.getStepZ();
+        final float half = PLUG_SIZE * 0.5F;
+
+        // Та же схема, что в emitPlug: near = грань + EPS, far = наружу.
+        final float plane = (nx + ny + nz) > 0 ? 1.0F : 0.0F;
+        final float near = plane + (plane > 0.5F ? LINE_EPS : -LINE_EPS);
+        final float far = near + (nx + ny + nz) * PLUG_DEPTH;
+        final float lo;
+        final float hi;
+        if (near < far) {
+            lo = near;
+            hi = far;
+        } else {
+            lo = far;
+            hi = near;
+        }
+
+        float x0;
+        float x1;
+        float y0;
+        float y1;
+        float z0;
+        float z1;
+        if (nx != 0) {
+            x0 = lo;
+            x1 = hi;
+            y0 = 0.5F - half;
+            y1 = 0.5F + half;
+            z0 = 0.5F - half;
+            z1 = 0.5F + half;
+        } else if (ny != 0) {
+            x0 = 0.5F - half;
+            x1 = 0.5F + half;
+            y0 = lo;
+            y1 = hi;
+            z0 = 0.5F - half;
+            z1 = 0.5F + half;
+        } else {
+            x0 = 0.5F - half;
+            x1 = 0.5F + half;
+            y0 = 0.5F - half;
+            y1 = 0.5F + half;
+            z0 = lo;
+            z1 = hi;
+        }
+
+        // 8 вершин бокса.
+        // Рёбра вдоль X (4).
+        edge(lines, pose, x0, y0, z0, x1, y0, z0, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x0, y1, z0, x1, y1, z0, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x0, y0, z1, x1, y0, z1, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x0, y1, z1, x1, y1, z1, r, g, b, a, nx, ny, nz);
+        // Рёбра вдоль Y (4).
+        edge(lines, pose, x0, y0, z0, x0, y1, z0, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x1, y0, z0, x1, y1, z0, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x0, y0, z1, x0, y1, z1, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x1, y0, z1, x1, y1, z1, r, g, b, a, nx, ny, nz);
+        // Рёбра вдоль Z (4).
+        edge(lines, pose, x0, y0, z0, x0, y0, z1, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x1, y0, z0, x1, y0, z1, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x0, y1, z0, x0, y1, z1, r, g, b, a, nx, ny, nz);
+        edge(lines, pose, x1, y1, z0, x1, y1, z1, r, g, b, a, nx, ny, nz);
+    }
+
+    private static void edge(VertexConsumer lines, PoseStack.Pose pose,
+                             float ax, float ay, float az,
+                             float bx, float by, float bz,
+                             float r, float g, float b, float a,
+                             float nx, float ny, float nz) {
+        lines.addVertex(pose, ax, ay, az).setColor(r, g, b, a).setNormal(pose, nx, ny, nz);
+        lines.addVertex(pose, bx, by, bz).setColor(r, g, b, a).setNormal(pose, nx, ny, nz);
+    }
+
+    /**
+     * Биты сторон одним числом: 2 бита на грань (порядок DIRS =
+     * ordinal Direction). 0 = глухая, 1 = IN, 2 = OUT, 3 = IN_OUT.
+     */
+    private static int sideBitsOf(MechanicalMachine machine) {
+        int sides = 0;
+        for (int d = 0; d < 6; d++) {
+            final Direction dir = DIRS[d];
+            int side = 0;
+            if (machine.isInputSide(dir)) {
+                side |= SIDE_IN;
+            }
+            if (machine.isOutputSide(dir)) {
+                side |= SIDE_OUT;
+            }
+            sides |= side << (d * 2);
+        }
+        return sides;
+    }
+
+
+    // --- Форматы вершин: fill = debugQuads() = POSITION_COLOR (без нормали); lines = lines() = POSITION_COLOR_NORMAL.
+    // Буферы берутся по очереди (весь fill, потом весь lines): shared-BufferSource переключает тип через endBatch.
+}
