@@ -81,20 +81,17 @@ public class ShaftRenderer extends MechanicalRenderer<ShaftBlockEntity> {
         }
 
         final boolean vertical = axis == Direction.Axis.Y;
-        if(vertical) {
-            if(val_v != null) {
-                switch (axis) {
-                    case X -> val_h.rotate(angle, 0, 0);
-                    case Z -> val_h.rotate(0, 0, angle);
-                    default -> val_h.rotate(0, angle, 0);
-                }
-            }
-        } else if (val_h != null) {
-            switch (axis) {
-                case X -> val_h.rotate(angle, 0, 0);
-                case Z -> val_h.rotate(0, 0, angle);
-                default -> val_h.rotate(0, angle, 0);
-            }
+        // Вращение вокруг МОДЕЛЬНОЙ оси вала: в val_horizontal вал лежит
+        // вдоль локальной Z (N/S работает с rotZ — значит ось Z модели),
+        // в val_vertical — вдоль локальной Y. Ориентацию в мир переносит
+        // poseStack (YP90 для оси X), поэтому локальная ось вращения от
+        // оси блока НЕ зависит: смена rotX/rotZ по оси блока крутит вал
+        // перпендикулярно себе («винт») на E/W.
+        if (val_h != null) {
+            val_h.rotate(0, 0, angle);
+        }
+        if (val_v != null) {
+            val_v.rotate(0, angle, 0);
         }
 
         poseStack.pushPose();
