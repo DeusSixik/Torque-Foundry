@@ -329,6 +329,14 @@ public class MechanicalMachine {
         return passive;
     }
 
+    /**
+     * Машина является проходным сегментом вала (полноценный вал-блок
+     * или вал-вставка шасси): износ по оборотам/моменту применяется.
+     */
+    public boolean isShaftSegment() {
+        return false;
+    }
+
     protected void setPassive(boolean passive) {
         this.passive = passive;
     }

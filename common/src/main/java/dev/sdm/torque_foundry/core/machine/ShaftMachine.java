@@ -21,6 +21,11 @@ public class ShaftMachine extends MechanicalMachine {
     }
 
     @Override
+    public boolean isShaftSegment() {
+        return true;
+    }
+
+    @Override
     public void setAxis(Direction.Axis axis) {
         super.setAxis(axis);
         applyAxisPorts();

@@ -62,8 +62,9 @@ public class ChassisBlock extends MechanicalBlock {
 
     /**
      * ПКМ по шасси:
-     * - шестернёй — вставить (если слот пуст)
-     * - гаечным ключом — извлечь шестерню
+     * - шестернёй или валом — вставить ядро (если слот пуст; замена —
+     *   старое в инвентарь)
+     * - гаечным ключом — извлечь ядро
      * - рукой — статус
      */
     @Override
@@ -73,28 +74,31 @@ public class ChassisBlock extends MechanicalBlock {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
 
-        // Вставка шестерни
-        if (stack.getItem() instanceof dev.sdm.torque_foundry.core.item.GearItem) {
-            if (!be.getGear().isEmpty()) {
+        final boolean isCoreItem = stack.getItem() instanceof dev.sdm.torque_foundry.core.item.GearItem
+                || stack.getItem() instanceof dev.sdm.torque_foundry.core.item.ShaftPartItem;
+
+        // Вставка ядра (шестерня или вал)
+        if (isCoreItem) {
+            if (!be.getCore().isEmpty()) {
                 if (!level.isClientSide) {
                     player.displayClientMessage(Component.translatable(
                             "item.torque_foundry.chassis.gear_returned"), true);
-                    // Старая возвращается в инвентарь
-                    player.getInventory().placeItemBackInInventory(be.takeGear());
-                    installGear(be, stack, player);
+                    // Старое ядро возвращается в инвентарь
+                    player.getInventory().placeItemBackInInventory(be.takeCore());
+                    installCore(be, stack, player);
                 }
                 return ItemInteractionResult.sidedSuccess(level.isClientSide);
             }
             if (!level.isClientSide) {
-                installGear(be, stack, player);
+                installCore(be, stack, player);
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
 
         // Извлечение ключом
         if (stack.getItem() == TFItems.WRENCH.get()) {
-            if (!level.isClientSide && !be.getGear().isEmpty()) {
-                player.getInventory().placeItemBackInInventory(be.takeGear());
+            if (!level.isClientSide && !be.getCore().isEmpty()) {
+                player.getInventory().placeItemBackInInventory(be.takeCore());
                 player.displayClientMessage(Component.translatable(
                         "item.torque_foundry.chassis.gear_taken"), true);
             }
@@ -104,29 +108,53 @@ public class ChassisBlock extends MechanicalBlock {
         return super.useItemOn(stack, state, level, pos, player, hand, hit);
     }
 
-    private static void installGear(ChassisBlockEntity be, ItemStack stack, Player player) {
-        be.setGear(stack.copyWithCount(1));
+    private static void installCore(ChassisBlockEntity be, ItemStack stack, Player player) {
+        be.setCore(stack.copyWithCount(1));
         stack.consume(1, player);
         player.displayClientMessage(Component.translatable(
                 "item.torque_foundry.chassis.gear_installed",
-                dev.sdm.torque_foundry.core.item.GearItem.teethOf(stack)), true);
+                coreName(be)), true);
+    }
+
+    private static Component coreName(ChassisBlockEntity be) {
+        final var core = be.getCore();
+        if (core.getItem() instanceof dev.sdm.torque_foundry.core.item.ShaftPartItem) {
+            return Component.translatable("item.torque_foundry.shaft_part",
+                    dev.sdm.torque_foundry.core.item.ShaftPartItem.materialOf(core).name());
+        }
+        return Component.translatable("item.torque_foundry.gear.teeth",
+                dev.sdm.torque_foundry.core.item.GearItem.teethOf(core),
+                dev.sdm.torque_foundry.core.item.GearItem.DRIVE_TEETH,
+                dev.sdm.torque_foundry.core.item.GearItem.ratio(
+                        dev.sdm.torque_foundry.core.item.GearItem.teethOf(core)) >= 1.0
+                        ? String.format(java.util.Locale.ROOT, "1:%.2f",
+                                dev.sdm.torque_foundry.core.item.GearItem.ratio(
+                                        dev.sdm.torque_foundry.core.item.GearItem.teethOf(core)))
+                        : String.format(java.util.Locale.ROOT, "%.2f:1", 1.0 / dev.sdm.torque_foundry.core.item.GearItem.ratio(
+                                dev.sdm.torque_foundry.core.item.GearItem.teethOf(core))));
     }
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
                                                Player player, BlockHitResult hit) {
         if (level.getBlockEntity(pos) instanceof ChassisBlockEntity be && !level.isClientSide) {
-            if (be.getGear().isEmpty()) {
+            if (be.getCore().isEmpty()) {
                 player.displayClientMessage(Component.translatable(
                         "item.torque_foundry.chassis.empty"), false);
             } else {
-                final var gear = be.getGear();
-                final int teeth = dev.sdm.torque_foundry.core.item.GearItem.teethOf(gear);
-                final double ratio = dev.sdm.torque_foundry.core.item.GearItem.ratio(teeth);
-                player.displayClientMessage(Component.translatable(
-                        "item.torque_foundry.chassis.status", teeth,
-                        String.format(java.util.Locale.ROOT, "1:%.2f", ratio),
-                        dev.sdm.torque_foundry.core.item.GearItem.materialOf(gear).name()), false);
+                final var core = be.getCore();
+                if (core.getItem() instanceof dev.sdm.torque_foundry.core.item.ShaftPartItem) {
+                    final var material = dev.sdm.torque_foundry.core.item.ShaftPartItem.materialOf(core);
+                    player.displayClientMessage(Component.translatable(
+                            "item.torque_foundry.chassis.shaft_status", material.name()), false);
+                } else {
+                    final int teeth = dev.sdm.torque_foundry.core.item.GearItem.teethOf(core);
+                    final double ratio = dev.sdm.torque_foundry.core.item.GearItem.ratio(teeth);
+                    player.displayClientMessage(Component.translatable(
+                            "item.torque_foundry.chassis.status", teeth,
+                            String.format(java.util.Locale.ROOT, "1:%.2f", ratio),
+                            dev.sdm.torque_foundry.core.item.GearItem.materialOf(core).name()), false);
+                }
             }
         }
         return super.useWithoutItem(state, level, pos, player, hit);

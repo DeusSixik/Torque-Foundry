@@ -61,7 +61,7 @@ public final class MechanicalGroupManager {
 
     /**
      * Снапшот групп для физического тика (снимается под блокировкой).
-     * primitiveValues() — живой view мапы: без копии в массив итерация
+     * values() — живой view мапы: без копии в массив итерация
      * в потоке физики упадёт с CME при мутации с серверного треда.
      */
     public static synchronized MechanicalGroup[] getGroupsPrimitive() {

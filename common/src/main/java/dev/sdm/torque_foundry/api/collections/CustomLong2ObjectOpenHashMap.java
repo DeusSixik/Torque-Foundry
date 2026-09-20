@@ -9,8 +9,4 @@ public class CustomLong2ObjectOpenHashMap<V> extends Long2ObjectOpenHashMap<V> {
     public ObjectCollection<V> values() {
         return super.values();
     }
-
-    public V[] primitiveValues() {
-        return value;
-    }
 }

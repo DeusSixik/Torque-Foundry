@@ -83,6 +83,14 @@ public final class TFBlocks {
                         output.accept(dev.sdm.torque_foundry.core.item.TFItems.WRENCH.get());
                         output.accept(CHASSIS_ITEM.get());
                         output.accept(dev.sdm.torque_foundry.core.item.TFItems.GEAR.get());
+                        output.accept(dev.sdm.torque_foundry.core.item.ShaftPartItem.create(
+                                dev.sdm.torque_foundry.physics.material.PhysicsMaterials.WOOD));
+                        output.accept(dev.sdm.torque_foundry.core.item.ShaftPartItem.create(
+                                dev.sdm.torque_foundry.physics.material.PhysicsMaterials.BRONZE));
+                        output.accept(dev.sdm.torque_foundry.core.item.ShaftPartItem.create(
+                                dev.sdm.torque_foundry.physics.material.PhysicsMaterials.IRON));
+                        output.accept(dev.sdm.torque_foundry.core.item.ShaftPartItem.create(
+                                dev.sdm.torque_foundry.physics.material.PhysicsMaterials.STEEL));
                     })
             ));
 

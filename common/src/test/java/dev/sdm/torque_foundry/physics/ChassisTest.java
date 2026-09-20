@@ -25,7 +25,7 @@ public class ChassisTest {
     @Test
     void emptyChassis_isSealed() {
         final ChassisMachine chassis = new ChassisMachine();
-        assertFalse(chassis.hasGear());
+        assertFalse(chassis.hasCore());
         assertTrue(chassis.getInputDirections().length == 0, "empty chassis = no input port");
         assertTrue(chassis.getOutputDirections().length == 0, "empty chassis = no output port");
     }

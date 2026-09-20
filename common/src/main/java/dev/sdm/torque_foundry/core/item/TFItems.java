@@ -57,6 +57,13 @@ public final class TFItems {
             () -> new GearItem(props().stacksTo(16))
     );
 
+    // --- Вал (вставка в шасси) ---
+
+    public static final RegistrySupplier<ShaftPartItem> SHAFT_PART = TFBlocks.ITEMS.register(
+            id("shaft_part"),
+            () -> new ShaftPartItem(props().stacksTo(16))
+    );
+
     /** Предмет -> тип подшипника (null — предмет не подшипник). */
     public static BearingType bearingOf(Item item) {
         if (item == BEARING_SLEEVE.get()) {

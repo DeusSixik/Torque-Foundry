@@ -49,6 +49,15 @@ public final class TFComponents {
                     .build()
     );
 
+    /** Имя физического материала предмета-вала (см. ShaftPartItem.materialOf). */
+    public static final RegistrySupplier<DataComponentType<String>> SHAFT_MATERIAL = TYPES.register(
+            TFBlocks.id("shaft_material"),
+            () -> DataComponentType.<String>builder()
+                    .persistent(Codec.STRING)
+                    .networkSynchronized(ByteBufCodecs.STRING_UTF8.cast())
+                    .build()
+    );
+
     private static StreamCodec<RegistryFriendlyByteBuf, ShaftGrade> gradeStream() {
         return ByteBufCodecs.STRING_UTF8
                 .map(ShaftGrade::byName, ShaftGrade::getSerializedName)

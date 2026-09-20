@@ -24,7 +24,8 @@ public final class ShaftWearHook implements PhysicsHook {
 
     @Override
     public RotationalPower onTransmit(MechanicalMachine from, MechanicalMachine to, RotationalPower power, SimulationContext context) {
-        if (!(from instanceof dev.sdm.torque_foundry.core.machine.ShaftMachine)) {
+        // Полноценные валы и вал-вставки шасси изнашиваются одинаково
+        if (!from.isShaftSegment()) {
             return power;
         }
 

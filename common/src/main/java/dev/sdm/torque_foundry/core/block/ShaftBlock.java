@@ -175,7 +175,10 @@ public class ShaftBlock extends MechanicalBlock {
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
 
-        // Статус узла: группа, перекос, опоры, смазка
+        // Статус узла: группа, перекос, опоры, смазка.
+        // ВАЖНО: TranslatableContents принимает только Component|Number|Boolean|String —
+        // enum'ы (BearingType, LubricantState.Type) отдаём через .name(), иначе
+        // сервер роняет пакет useItemOn с IllegalArgumentException.
         if (be != null && !level.isClientSide) {
             final dev.sdm.torque_foundry.physics.machine.Bearing a = be.machine.getBearing(0);
             final dev.sdm.torque_foundry.physics.machine.Bearing b = be.machine.getBearing(1);
@@ -183,10 +186,11 @@ public class ShaftBlock extends MechanicalBlock {
             player.displayClientMessage(Component.translatable(
                     "message.torque_foundry.shaft_status",
                     be.machine.getGroupIndex(),
-                    be.machine.getMisalignmentDeg(),
-                    a.type(), Math.round(a.wear() * 100),
-                    b.type(), Math.round(b.wear() * 100),
-                    Math.round(lube.amount()), (int) LubricantState.CAPACITY, lube.type()), false);
+                    String.format(java.util.Locale.ROOT, "%.1f", be.machine.getMisalignmentDeg()),
+                    a.type().name(), Math.round(a.wear() * 100),
+                    b.type().name(), Math.round(b.wear() * 100),
+                    Math.round(lube.amount()), (int) LubricantState.CAPACITY,
+                    lube.type().name()), false);
         }
         return super.useWithoutItem(blockState, level, blockPos, player, blockHitResult);
     }
@@ -218,7 +222,8 @@ public class ShaftBlock extends MechanicalBlock {
                 be.machine.installBearing(slot, bearing);
                 stack.consume(1, player);
                 player.displayClientMessage(Component.translatable(
-                        "message.torque_foundry.bearing_installed", bearing, slot), true);
+                        "message.torque_foundry.bearing_installed",
+                        bearing.name(), slot), true);
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -230,7 +235,7 @@ public class ShaftBlock extends MechanicalBlock {
             be.machine.getLubricant().fill(lube, LubricantState.CAPACITY);
             stack.consume(1, player);
             player.displayClientMessage(Component.translatable(
-                    "message.torque_foundry.lubricated", lube), true);
+                    "message.torque_foundry.lubricated", lube.name()), true);
             return ItemInteractionResult.sidedSuccess(false);
         }
 
