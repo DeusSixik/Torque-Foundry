@@ -30,6 +30,10 @@ public final class TFBlockEntities {
             BLOCK_ENTITY_TYPES.register(TFBlocks.id("junction"),
                     () -> BlockEntityType.Builder.of(JunctionBlockEntity::new, TFBlocks.JUNCTION.get()).build(null));
 
+    public static final RegistrySupplier<BlockEntityType<CaseBlockEntity>> CASE =
+            BLOCK_ENTITY_TYPES.register(TFBlocks.id("case"),
+                    () -> BlockEntityType.Builder.of(CaseBlockEntity::new, TFBlocks.CASE.get()).build(null));
+
     public static void register() {
         // Static initialization registers everything via Architectury RegistrarManager.
     }

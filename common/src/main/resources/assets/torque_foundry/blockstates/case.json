@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "axis=x,ceiling=false": { "model": "torque_foundry:block/case" },
+    "axis=x,ceiling=true":  { "model": "torque_foundry:block/case" },
+    "axis=y,ceiling=false": { "model": "torque_foundry:block/case" },
+    "axis=y,ceiling=true":  { "model": "torque_foundry:block/case" },
+    "axis=z,ceiling=false": { "model": "torque_foundry:block/case" },
+    "axis=z,ceiling=true":  { "model": "torque_foundry:block/case" }
+  }
+}

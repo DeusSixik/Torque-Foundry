@@ -1,8 +1,7 @@
-package dev.sdm.torque_foundry.core.client.models;
+package dev.sdm.torque_foundry.core.client.render.gltf;
 
 import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.core.client.render.LODModel;
-import dev.sdm.torque_foundry.core.client.render.gltf.GltfModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 

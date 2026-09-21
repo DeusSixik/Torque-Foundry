@@ -4,6 +4,7 @@
   "block.torque_foundry.consumer": "Потребитель",
   "block.torque_foundry.chassis": "Корпус коробки",
   "block.torque_foundry.junction": "Узел вала",
+  "block.torque_foundry.case": "Корпус",
 
   "item.torque_foundry.bearing_sleeve": "Втулка",
   "item.torque_foundry.bearing_roller": "Роликовый подшипник",
@@ -27,6 +28,10 @@
   "item.torque_foundry.chassis.gear_taken": "Шестерня извлечена",
   "item.torque_foundry.chassis.gear_installed": "Шестерня установлена: %s зуб.",
   "item.torque_foundry.chassis.gear_returned": "Старая шестерня в инвентаре",
+  "item.torque_foundry.case.shaft_installed": "Вал установлен: %s",
+  "item.torque_foundry.case.shaft_taken": "Вал извлечён",
+  "item.torque_foundry.case.shaft_returned": "Старый вал в инвентаре",
+  "item.torque_foundry.case.empty": "Корпус пуст (вставьте вал)",
 
   "message.torque_foundry.shaft_material": "Материал вала: %s",
   "message.torque_foundry.shaft_status": "Группа: %s | Перекос: +%s\u00B0 | Опоры: %s (%s%% износ) / %s (%s%% износ) | Смазка: %s/%s %s",

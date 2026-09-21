@@ -64,8 +64,11 @@ public final class PartTextures {
     }
 
     private static ResourceLocation resolveUncached(String partName, PhysicsMaterial material) {
-        final String part = partName.toLowerCase(Locale.ROOT);
-        final String mat = material.name().toLowerCase(Locale.ROOT);
+        // Имена мешей приходят из Blender как есть — там легко получить
+        // кириллицу ("Сorp" вместо "Corp"), а ResourceLocation такое не ест
+        // (только [a-z0-9/._-]). Чистим сегменты, о подмене — варнинг в лог.
+        final String part = sanitize(partName.toLowerCase(Locale.ROOT), "part", partName);
+        final String mat = sanitize(material.name().toLowerCase(Locale.ROOT), "material", material.name());
 
         // 1. Своя текстура части + материала.
         final ResourceLocation ownMat = modTexture("parts/" + part + "_" + mat);
@@ -84,6 +87,29 @@ public final class PartTextures {
     private static ResourceLocation modTexture(String path) {
         return ResourceLocation.fromNamespaceAndPath(TorqueFoundry.MOD_ID,
                 "textures/block/" + path + ".png");
+    }
+
+    /**
+     * Чистит сегмент пути до алфавита ResourceLocation [a-z0-9/._-].
+     * При подмене пишет варнинг с исходником — иначе кириллицу в имени
+     * меша из Blender не найти (падает ResourceLocationException в рендере).
+     */
+    private static String sanitize(String value, String kind, String original) {
+        final StringBuilder clean = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            final char c = value.charAt(i);
+            if (c >= 'a' && c <= 'z' || c >= '0' && c <= '9'
+                    || c == '/' || c == '.' || c == '_' || c == '-') {
+                clean.append(c);
+            }
+        }
+        final String result = clean.toString();
+        if (!result.equals(value)) {
+            TorqueFoundry.LOGGER.warn(
+                    "[TF-render] {} name '{}' has non-resource characters, using '{}' — rename the mesh in Blender",
+                    kind, original, result);
+        }
+        return result.isEmpty() ? "part" : result;
     }
 
     /** Есть ли ресурс в менеджере (клиент). */

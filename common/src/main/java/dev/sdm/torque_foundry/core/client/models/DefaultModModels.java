@@ -1,6 +1,7 @@
 package dev.sdm.torque_foundry.core.client.models;
 
 import dev.sdm.torque_foundry.core.client.render.gltf.GltfModel;
+import dev.sdm.torque_foundry.core.client.render.gltf.GltfModels;
 import net.minecraft.resources.ResourceLocation;
 
 public final class DefaultModModels {

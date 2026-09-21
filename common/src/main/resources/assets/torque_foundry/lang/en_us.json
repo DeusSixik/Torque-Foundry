@@ -4,6 +4,7 @@
   "block.torque_foundry.consumer": "Consumer",
   "block.torque_foundry.chassis": "Gearbox Chassis",
   "block.torque_foundry.junction": "Shaft Junction",
+  "block.torque_foundry.case": "Casing",
 
   "item.torque_foundry.bearing_sleeve": "Sleeve Bearing",
   "item.torque_foundry.bearing_roller": "Roller Bearing",
@@ -27,6 +28,10 @@
   "item.torque_foundry.chassis.gear_taken": "Gear removed",
   "item.torque_foundry.chassis.gear_installed": "Gear installed: %s teeth",
   "item.torque_foundry.chassis.gear_returned": "Old gear returned to inventory",
+  "item.torque_foundry.case.shaft_installed": "Shaft installed: %s",
+  "item.torque_foundry.case.shaft_taken": "Shaft removed",
+  "item.torque_foundry.case.shaft_returned": "Old shaft returned to inventory",
+  "item.torque_foundry.case.empty": "Casing is empty (insert a shaft)",
 
   "message.torque_foundry.shaft_material": "Shaft material: %s",
   "message.torque_foundry.shaft_status": "Group: %s | Misalign: +%s\u00B0 | Bearings: %s (%s%% worn) / %s (%s%% worn) | Lube: %s/%s %s",

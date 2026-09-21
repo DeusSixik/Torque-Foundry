@@ -6,6 +6,7 @@ import dev.sdm.torque_foundry.core.block.ShaftBlock;
 import dev.sdm.torque_foundry.core.block.ShaftBlockEntity;
 import dev.sdm.torque_foundry.core.client.render.LODModel;
 import dev.sdm.torque_foundry.core.client.render.PartTextures;
+import dev.sdm.torque_foundry.core.client.render.gltf.GltfModels;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.Direction;

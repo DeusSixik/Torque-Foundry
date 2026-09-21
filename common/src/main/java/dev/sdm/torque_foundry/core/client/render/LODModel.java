@@ -67,6 +67,11 @@ public class LODModel {
 
     private void renderPart(Part part, PoseStack poseStack, MultiBufferSource bufferSource, ResourceLocation texture,
                             int packedLight, int packedOverlay, double distanceSqr, float partialTick) {
+        // Ручное скрытие узла (пустой корпус без вставки, снятая деталь).
+        // Дефолт true — существующие рендеры не меняются.
+        if (!part.visible) {
+            return;
+        }
         if (!part.shouldRender(distanceSqr)) {
             return;
         }
@@ -140,6 +145,12 @@ public class LODModel {
          * крафта, разные текстуры.
          */
         public ResourceLocation textureOverride;
+
+        /**
+         * Ручная видимость узла (пустой слот корпуса, снятая деталь).
+         * Дефолт true — скрытие выставляется рендером каждый кадр.
+         */
+        public boolean visible = true;
 
         private final List<LODBox> boxes = new ObjectArrayList<>();
         private final List<Part> children = new ObjectArrayList<>();

@@ -12,3 +12,6 @@
 /common/logs
 /net
 /com
+/fab-src-tmp
+/mc-src-tmp
+*.log
