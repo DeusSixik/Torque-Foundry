@@ -5,7 +5,7 @@ import dev.architectury.registry.client.rendering.BlockEntityRendererRegistry;
 import dev.sdm.torque_foundry.TorqueFoundry;
 import dev.sdm.torque_foundry.core.block.TFBlockEntities;
 import dev.sdm.torque_foundry.core.client.models.CaseRenderer;
-import dev.sdm.torque_foundry.core.client.models.MechanicalRenderer;
+import dev.sdm.torque_foundry.api.render.MechanicalRenderer;
 import dev.sdm.torque_foundry.core.client.models.ShaftRenderer;
 import foundry.imgui.api.ImGuiMCEvents;
 

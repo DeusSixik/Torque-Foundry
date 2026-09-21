@@ -1,8 +1,11 @@
 package dev.sdm.torque_foundry.core.client.render.structs;
 
-import dev.team_argentum.ga_utils.api.Struct;
-
-//@Struct(backend = Struct.Backend.FLATTEN)
+/**
+ * Вершина квада модели: позиция, нормаль и UV.
+ *
+ * <p>Mutable POD-структура: поля публичные и меняются напрямую без геттеров —
+ * это hot path рендера, аллокации и вызовы методов здесь измеряются.
+ */
 public class Vertex {
     public float x;
     public float y;

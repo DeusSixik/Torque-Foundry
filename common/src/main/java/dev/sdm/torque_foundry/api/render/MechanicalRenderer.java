@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.core.client.models;
+package dev.sdm.torque_foundry.api.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;

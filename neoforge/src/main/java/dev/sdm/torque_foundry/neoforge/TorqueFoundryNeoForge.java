@@ -1,7 +1,7 @@
 package dev.sdm.torque_foundry.neoforge;
 
 import dev.sdm.torque_foundry.TorqueFoundry;
-import dev.sdm.torque_foundry.core.client.models.MechanicalItemRenderer;
+import dev.sdm.torque_foundry.api.render.MechanicalItemRenderer;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;

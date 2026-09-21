@@ -1,6 +1,6 @@
 package dev.sdm.torque_foundry.fabric.client;
 
-import dev.sdm.torque_foundry.core.client.models.MechanicalItemRenderer;
+import dev.sdm.torque_foundry.api.render.MechanicalItemRenderer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.BuiltinItemRendererRegistry;
 

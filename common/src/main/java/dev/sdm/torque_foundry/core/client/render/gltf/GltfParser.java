@@ -35,19 +35,31 @@ public final class GltfParser {
 
     // --- glTF константы ---
 
-    /** Магика glb: 'glTF'. */
+    /**
+     * Магика glb: 'glTF'.
+     */
     private static final int GLB_MAGIC = 0x46546C67;
-    /** Тип чанка JSON. */
+    /**
+     * Тип чанка JSON.
+     */
     private static final int GLB_CHUNK_JSON = 0x4E4F534A;
-    /** Тип чанка BIN. */
+    /**
+     * Тип чанка BIN.
+     */
     private static final int GLB_CHUNK_BIN = 0x004E4942;
 
-    /** mode: TRIANGLES. Единственный поддерживаемый режим примитива. */
+    /**
+     * mode: TRIANGLES. Единственный поддерживаемый режим примитива.
+     */
     private static final int MODE_TRIANGLES = 4;
 
-    /** componentType. */
+    /**
+     * componentType.
+     */
+    @SuppressWarnings("unused")
     private static final int CT_BYTE = 5120;
     private static final int CT_UNSIGNED_BYTE = 5121;
+    @SuppressWarnings("unused")
     private static final int CT_SHORT = 5122;
     private static final int CT_UNSIGNED_SHORT = 5123;
     private static final int CT_UNSIGNED_INT = 5125;
@@ -230,7 +242,8 @@ public final class GltfParser {
 
         // Корни: scene[0].nodes, иначе все без родителей.
         int[] roots;
-        final JsonArray scenes = optArray(root, "scenes");        if (!scenes.isEmpty()) {
+        final JsonArray scenes = optArray(root, "scenes");
+        if (!scenes.isEmpty()) {
             final JsonObject scene = scenes.get(0).getAsJsonObject();
             final List<Integer> list = new ArrayList<>();
             if (scene.has("nodes")) {
@@ -244,16 +257,18 @@ public final class GltfParser {
             roots = allRoots(hasParent);
         }
 
-        final float[] identity = composeTRS(new float[3], new float[]{0, 0, 0, 1}, new float[]{1, 1, 1});
+        final float[] identity = composeTRS(new float[3], new float[]{0, 0, 0, 1},
+                new float[]{1, 1, 1});
         final boolean[] visited = new boolean[nodeCount];
-        // DFS с явной парой (узел, матрица родителя) — иерархия обычно плоская.
-        final List<int[]> pending = new ArrayList<>();
+        // DFS с явным стеком (узел + матрица родителя): два параллельных списка
+        // вместо массива int[1] под стек-фрейм — ноль wrapper-аллокаций на узел.
+        final List<Integer> pending = new ArrayList<>();
         final List<float[]> pendingWorld = new ArrayList<>();
         for (int r = 0; r < roots.length; r++) {
-            pending.add(new int[]{roots[r]});
+            pending.add(roots[r]);
             pendingWorld.add(identity);
             while (!pending.isEmpty()) {
-                final int idx = pending.remove(pending.size() - 1)[0];
+                final int idx = pending.remove(pending.size() - 1);
                 final float[] parentWorld = pendingWorld.remove(pendingWorld.size() - 1);
                 if (visited[idx]) {
                     continue;
@@ -265,7 +280,7 @@ public final class GltfParser {
                 final int meshIndex = n.has("mesh") ? n.get("mesh").getAsInt() : -1;
                 nodes.add(new RawNode(nodeName, meshIndex, worldM));
                 for (int child : children.get(idx)) {
-                    pending.add(new int[]{child});
+                    pending.add(child);
                     pendingWorld.add(worldM);
                 }
             }
@@ -292,7 +307,9 @@ public final class GltfParser {
         return out;
     }
 
-    /** Умножение column-major матриц 4x4: out = a * b. */
+    /**
+     * Умножение column-major матриц 4x4: out = a * b.
+     */
     private static float[] mul(float[] a, float[] b) {
         final float[] out = new float[16];
         for (int c = 0; c < 4; c++) {
@@ -308,11 +325,11 @@ public final class GltfParser {
     }
 
     private static RawPrimitive parsePrimitive(JsonObject prim, String debugName,
-                                               List<byte[]> buffers,
-                                               BufferView[] bufferViews, Accessor[] accessors) {
+                                               List<byte[]> buffers, BufferView[] bufferViews, Accessor[] accessors) {
         final int mode = prim.has("mode") ? prim.get("mode").getAsInt() : MODE_TRIANGLES;
         if (mode != MODE_TRIANGLES) {
-            throw new IllegalArgumentException("Mesh " + debugName + ": only TRIANGLES supported, mode=" + mode);
+            throw new IllegalArgumentException(
+                    "Mesh " + debugName + ": only TRIANGLES supported, mode=" + mode);
         }
         final JsonObject attrs = prim.getAsJsonObject("attributes");
         if (attrs == null || !attrs.has("POSITION")) {
@@ -323,8 +340,8 @@ public final class GltfParser {
         final int uvAccessor = attrs.has("TEXCOORD_0") ? attrs.get("TEXCOORD_0").getAsInt() : -1;
         final int indexAccessor = prim.has("indices") ? prim.get("indices").getAsInt() : -1;
 
-        final float[] positions = readVec3(
-                accessors[posAccessor], buffers, bufferViews, debugName + ".POSITION");
+        final float[] positions =
+                readVec3(accessors[posAccessor], buffers, bufferViews, debugName + ".POSITION");
         final float[] normals = normAccessor >= 0
                 ? readVec3(accessors[normAccessor], buffers, bufferViews, debugName + ".NORMAL")
                 : null;
@@ -367,7 +384,9 @@ public final class GltfParser {
         return new RawPrimitive(outPos, outNorm, outUv);
     }
 
-    /** Матрица ноды: matrix напрямую или TRS (column-major, как в glTF). */
+    /**
+     * Матрица ноды: matrix напрямую или TRS (column-major, как в glTF).
+     */
     private static float[] parseNodeMatrix(JsonObject node) {
         if (node.has("matrix")) {
             final JsonArray arr = node.getAsJsonArray("matrix");
@@ -393,7 +412,9 @@ public final class GltfParser {
         return out;
     }
 
-    /** T * R * S, column-major 4x4. Кватернион (x, y, z, w). */
+    /**
+     * T * R * S, column-major 4x4. Кватернион (x, y, z, w).
+     */
     private static float[] composeTRS(float[] t, float[] q, float[] s) {
         final float x = q[0];
         final float y = q[1];
@@ -425,8 +446,8 @@ public final class GltfParser {
     private record Accessor(int bufferView, int byteOffset, int componentType, int count, String type) {
     }
 
-    private static float[] readVec3(Accessor acc, List<byte[]> buffers,
-                                    BufferView[] views, String debug) {
+    private static float[] readVec3(Accessor acc, List<byte[]> buffers, BufferView[] views,
+                                    String debug) {
         if (!"VEC3".equals(acc.type())) {
             throw new IllegalArgumentException(debug + ": expected VEC3, got " + acc.type());
         }
@@ -443,8 +464,8 @@ public final class GltfParser {
         return out;
     }
 
-    private static float[] readVec2(Accessor acc, List<byte[]> buffers,
-                                    BufferView[] views, String debug) {
+    private static float[] readVec2(Accessor acc, List<byte[]> buffers, BufferView[] views,
+                                    String debug) {
         if (!"VEC2".equals(acc.type())) {
             throw new IllegalArgumentException(debug + ": expected VEC2, got " + acc.type());
         }
@@ -460,8 +481,8 @@ public final class GltfParser {
         return out;
     }
 
-    private static int[] readIndices(Accessor acc, List<byte[]> buffers,
-                                     BufferView[] views, String debug) {
+    private static int[] readIndices(Accessor acc, List<byte[]> buffers, BufferView[] views,
+                                     String debug) {
         if (!"SCALAR".equals(acc.type())) {
             throw new IllegalArgumentException(debug + ": indices must be SCALAR");
         }
@@ -495,9 +516,11 @@ public final class GltfParser {
         return out;
     }
 
-    /** Срез буфера под accessor: учитывает byteOffset/strided interleaved. */
-    private static ByteBuffer slice(Accessor acc, List<byte[]> buffers,
-                                    BufferView[] views, int componentBytes) {
+    /**
+     * Срез буфера под accessor: учитывает byteOffset/strided interleaved.
+     */
+    private static ByteBuffer slice(Accessor acc, List<byte[]> buffers, BufferView[] views,
+                                    int componentBytes) {
         if (acc.bufferView() < 0) {
             throw new IllegalArgumentException("accessor without bufferView not supported");
         }

@@ -1,9 +1,7 @@
-package dev.sdm.torque_foundry.core.client.models;
+package dev.sdm.torque_foundry.api.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import com.mojang.math.MatrixUtil;
-import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
 import dev.sdm.torque_foundry.core.block.CaseBlockEntity;
 import dev.sdm.torque_foundry.core.block.ShaftBlockEntity;
 import dev.sdm.torque_foundry.core.block.TFBlocks;
@@ -18,10 +16,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Matrix4f;
-import org.joml.Quaternionf;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;

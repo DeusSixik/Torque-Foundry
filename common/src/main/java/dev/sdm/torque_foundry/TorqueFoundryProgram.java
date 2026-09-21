@@ -1,12 +1,9 @@
 package dev.sdm.torque_foundry;
 
 
-import dev.sdm.torque_foundry.core.client.render.Model;
-import dev.sdm.torque_foundry.core.client.render.structs.Quad;
 import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
-import net.minecraft.resources.ResourceLocation;
 
 public class TorqueFoundryProgram {
 

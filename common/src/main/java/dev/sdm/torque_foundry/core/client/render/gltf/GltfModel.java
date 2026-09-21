@@ -1,52 +1,81 @@
-﻿package dev.sdm.torque_foundry.core.client.render.gltf;
+package dev.sdm.torque_foundry.core.client.render.gltf;
 
 import dev.sdm.torque_foundry.TorqueFoundry;
+import dev.sdm.torque_foundry.core.client.render.LODGenerator;
 import dev.sdm.torque_foundry.core.client.render.structs.Quad;
 import dev.sdm.torque_foundry.core.client.render.structs.Vertex;
-import net.minecraft.resources.ResourceLocation;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.minecraft.resources.ResourceLocation;
+
 /**
- * glTF-РјРѕРґРµР»СЊ Р±Р»РѕРєР°: РЅР°Р±РѕСЂ РёРјРµРЅРѕРІР°РЅРЅС‹С… С‡Р°СЃС‚РµР№ (РјРµС€РµР№ РёР· Blender) СЃ LOD-СѓСЂРѕРІРЅСЏРјРё.
+ * glTF-модель блока: набор именованных частей (мешей из Blender) с LOD-уровнями.
  *
- * <p>РЎС‚СЂСѓРєС‚СѓСЂР° С„Р°Р№Р»РѕРІ РІ assets:
+ * <p>Структура файлов в assets:
  * <pre>
- *   models/block/shaft_lod0.glb  вЂ” LOD0: РјРµС€Рё Corp, Val, ...
- *   models/block/shaft_lod1.glb  вЂ” LOD1 (РѕРїС†РёРѕРЅР°Р»СЊРЅРѕ)
+ *   models/block/shaft_lod0.glb — LOD0: меши Corp, Val, ...
+ *   models/block/shaft_lod1.glb — LOD1 (опционально)
  * </pre>
- * РРјСЏ С‡Р°СЃС‚Рё = РёРјСЏ РјРµС€Р° РІ Blender. LOD-СѓСЂРѕРІРµРЅСЊ РІС‹Р±РёСЂР°РµС‚СЃСЏ СЂРµРЅРґРµСЂРѕРј РїРѕ РґРёСЃС‚Р°РЅС†РёРё.
+ * Имя части = имя меша в Blender. LOD-уровень выбирается рендером по дистанции.
  *
- * <p>РљРѕРЅРІРµСЂСЃРёСЏ РєРѕРѕСЂРґРёРЅР°С‚: Blender/glTF вЂ” РјРµС‚СЂС‹, Y-up; Р±Р»РѕРє вЂ” 0..16 РїРёРєСЃРµР»РµР№,
- * Y-up С‚РѕР¶Рµ (СЃРѕРІРїР°РґР°РµС‚). РњР°СЃС€С‚Р°Р±: glTF-РµРґРёРЅРёС†Р° * {@link #unitsToPixels} =
- * РїРёРєСЃРµР»Рё РјРѕРґРµР»Рё. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1 Рј = 16 px (РјРѕРґРµР»СЊ РІ РјРµС‚СЂРµ = СЂРѕРІРЅРѕ Р±Р»РѕРє).
- * РћСЃСЊ Z РёРЅРІРµСЂС‚РёСЂСѓРµС‚СЃСЏ (glTF +Z Рє Р·СЂРёС‚РµР»СЋ, Сѓ Р±Р»РѕРєР° -Z СЃРµРІРµСЂ) вЂ” РёРЅР°С‡Рµ РјРѕРґРµР»СЊ
- * Р·РµСЂРєР°Р»РёС‚СЃСЏ. РќРѕСЂРјР°Р»Рё РёРЅРІРµСЂС‚РёСЂСѓСЋС‚СЃСЏ РІРјРµСЃС‚Рµ СЃ РіРµРѕРјРµС‚СЂРёРµР№.
+ * <p>Конверсия координат: Blender/glTF — метры, Y-up; блок — 0..16 пикселей,
+ * Y-up тоже (совпадает). Масштаб: glTF-единица * {@link #unitsToPixels} =
+ * пиксели модели. По умолчанию 1 м = 16 px (модель в метре = ровно блок).
+ * Ось Z инвертируется (glTF +Z к зрителю, у блока -Z север) — иначе модель
+ * зеркалится. Нормали инвертируются вместе с геометрией.
  */
 public final class GltfModel {
 
     /**
-     * РњРµС‚СЂС‹ glTF -> РїРёРєСЃРµР»Рё РјРѕРґРµР»Рё (0..16 = Р±Р»РѕРє). 16 = РјРѕРґРµР»СЊ РІ 1 Рј.
+     * Метры glTF -> пиксели модели (0..16 = блок). 16 = модель в 1 м.
      */
     public static final float DEFAULT_UNITS_TO_PIXELS = 16.0F;
+    /**
+     * Допуск совпадения длиннейшей стороны с блоком: внутри — масштаб не трогаем.
+     */
+    private static final float AUTO_SCALE_TOLERANCE_PX = 0.05F;
+    /**
+     * Минимальная длина bbox для авто-масштаба: ниже — деление бессмысленно.
+     */
+    private static final float MIN_BBOX_FOR_SCALE = 1e-6F;
+    /**
+     * Центр блока в пикселях модели (fitToBlock сводит сюда XZ, Y на пол).
+     */
+    private static final float BLOCK_CENTER_PX = 8.0F;
+    /**
+     * Порог длины нормали: ниже — вектор вырожден, нормализацию пропускаем.
+     */
+    private static final float MIN_NORMAL_LENGTH = 1e-9F;
+    /**
+     * Pivot пустой части: центр блока.
+     */
+    private static final float[] EMPTY_PART_PIVOT = {8, 8, 8};
 
     /**
-     * РћРґРЅР° С‡Р°СЃС‚СЊ РјРѕРґРµР»Рё (РјРµС€ Blender): LOD-СѓСЂРѕРІРЅРё РєРІР°РґРѕРІ + pivot РґР»СЏ РІСЂР°С‰РµРЅРёСЏ.
+     * Одна часть модели (меш Blender): LOD-уровни квадов + pivot для вращения.
      */
     public static final class Part {
         public final String name;
-        /** РљРІР°РґС‹ РїРѕ LOD: lods[0] = РґРµС‚Р°Р»СЊРЅС‹Р№, РґР°Р»СЊС€Рµ вЂ” СѓРїСЂРѕС‰С‘РЅРЅС‹Рµ. */
+        /**
+         * Квады по LOD: lods[0] = детальный, дальше — упрощённые.
+         */
         public final List<Quad[]> lods;
-        /** Pivot РІСЂР°С‰РµРЅРёСЏ РІ РїРёРєСЃРµР»СЏС… РјРѕРґРµР»Рё (С†РµРЅС‚СЂ bounding box). */
+        /**
+         * Pivot вращения в пикселях модели (центр bounding box).
+         */
         public final float pivotX;
         public final float pivotY;
         public final float pivotZ;
-        /** Р’СЂР°С‰РµРЅРёРµ СѓР·Р»Р° (СЂР°РґРёР°РЅС‹), РјСѓС‚РёСЂСѓРµС‚СЃСЏ СЂРµРЅРґРµСЂРѕРј РєР°Р¶РґС‹Р№ РєР°РґСЂ. */
+        /**
+         * Вращение узла (радианы), мутируется рендером каждый кадр.
+         */
         public float rotX;
         public float rotY;
         public float rotZ;
@@ -87,27 +116,24 @@ public final class GltfModel {
     }
 
     /**
-     * Р—Р°РіСЂСѓР·РєР° РјРѕРґРµР»Рё: lod-С„Р°Р№Р»С‹ РїРѕ РїРѕСЂСЏРґРєСѓ (lod0 вЂ” РґРµС‚Р°Р»СЊРЅС‹Р№).
-     * РљР°Р¶РґС‹Р№ С„Р°Р№Р» вЂ” {@code .glb}; С‡Р°СЃС‚Рё СЃ С‚РµРј Р¶Рµ РёРјРµРЅРµРј РґРѕРїРѕР»РЅСЏСЋС‚ LOD-СѓСЂРѕРІРЅРё.
-     * Р‘Р°Р№С‚С‹ (РЅРµ РїРѕС‚РѕРєРё): С„Р°Р№Р» СЂР°СЃРїР°СЂСЃРёРІР°РµС‚СЃСЏ Р·Р° РѕРґРёРЅ РїСЂРѕС…РѕРґ, РїРѕРІС‚РѕСЂРЅС‹Рµ
-     * РїСЂРѕС…РѕРґС‹ (Р°РІС‚Рѕ-РјР°СЃС€С‚Р°Р±, РёРјРµРЅР° РјРµС€РµР№) СЂР°Р±РѕС‚Р°СЋС‚ СЃ СѓР¶Рµ СЂР°Р·РѕР±СЂР°РЅРЅС‹РјРё РґР°РЅРЅС‹РјРё.
+     * Загрузка модели: lod-файлы по порядку (lod0 — детальный).
+     * Каждый файл — {@code .glb}; части с тем же именем дополняют LOD-уровни.
+     * Байты (не потоки): файл распарсивается за один проход, повторные
+     * проходы (авто-масштаб, имена мешей) работают с уже разобранными данными.
      *
-     * @param fitToBlock     С†РµРЅС‚СЂРёСЂРѕРІР°С‚СЊ bbox РїРѕ X/Z РЅР° Р±Р»РѕРє (8,8) Рё РїРѕСЃР°РґРёС‚СЊ
-     *                       РЅР° РїРѕР» (minY = 0); РІС‹РєР»СЋС‡РёС‚СЊ, РµСЃР»Рё РјРѕРґРµР»СЊ СѓР¶Рµ
-     *                       РѕС‚С†РµРЅС‚СЂРёСЂРѕРІР°РЅР° РІ Blender
-     * @param autoScale      РїРѕРґРѕР±СЂР°С‚СЊ РјР°СЃС€С‚Р°Р±: СЃР°РјР°СЏ РґР»РёРЅРЅР°СЏ СЃС‚РѕСЂРѕРЅР° bbox
-     *                       РјРѕРґРµР»Рё = 16 px. РРЅР°С‡Рµ unitsToPixels РєР°Рє РµСЃС‚СЊ
+     * @param fitToBlock центрировать bbox по X/Z на блок (8,8) и посадить
+     *                   на пол (minY = 0); выключить, если модель уже отцентрирована в Blender
+     * @param autoScale  подобрать масштаб: самая длинная сторона bbox
+     *                   модели = 16 px. Иначе unitsToPixels как есть
      */
     public static GltfModel load(ResourceLocation texture, float unitsToPixels,
-                                 boolean fitToBlock, boolean autoScale,
-                                 byte[]... lodFiles) throws IOException {
+                                 boolean fitToBlock, boolean autoScale, byte[]... lodFiles) throws IOException {
         final GltfModel model = new GltfModel(texture);
         // Один парсинг на файл: сырые ноды/меши держим в памяти, квады
         // перестраиваются при смене масштаба без повторного чтения.
         final GltfParser.ParsedModel[] parsed = new GltfParser.ParsedModel[lodFiles.length];
         for (int lod = 0; lod < lodFiles.length; lod++) {
-            parsed[lod] = GltfParser.parseGlb(
-                    new java.io.ByteArrayInputStream(lodFiles[lod]));
+            parsed[lod] = GltfParser.parseGlb(new ByteArrayInputStream(lodFiles[lod]));
         }
 
         // Части строим ПО НОДАМ (не по мешам): нода несёт world-матрицу
@@ -123,7 +149,7 @@ public final class GltfModel {
         if (autoScale && !lodNodes.isEmpty() && !lodNodes.get(0).isEmpty()) {
             final float[] size = bboxSize(flattenNodes(lodNodes.get(0)));
             final float longest = Math.max(size[0], Math.max(size[1], size[2]));
-            if (longest > 1e-6F && Math.abs(longest - 16.0F) > 0.05F) {
+            if (longest > MIN_BBOX_FOR_SCALE && Math.abs(longest - 16.0F) > AUTO_SCALE_TOLERANCE_PX) {
                 finalScale = unitsToPixels * (16.0F / longest);
                 lodNodes.clear();
                 for (int lod = 0; lod < parsed.length; lod++) {
@@ -139,9 +165,9 @@ public final class GltfModel {
         if (fitToBlock && !lodNodes.isEmpty()) {
             final float[] min = bboxMin(flattenNodes(lodNodes.get(0)));
             final float[] max = bboxMax(flattenNodes(lodNodes.get(0)));
-            offX = 8.0F - (min[0] + max[0]) * 0.5F;
+            offX = BLOCK_CENTER_PX - (min[0] + max[0]) * 0.5F;
             offY = -min[1];
-            offZ = 8.0F - (min[2] + max[2]) * 0.5F;
+            offZ = BLOCK_CENTER_PX - (min[2] + max[2]) * 0.5F;
         }
 
         // Сборка частей: имя ноды -> LOD-уровни. Совпадение имён нескольких
@@ -159,8 +185,7 @@ public final class GltfModel {
                         }
                     }
                 }
-                final List<Quad[]> lods =
-                        partLods.computeIfAbsent(node.name(), k -> new ArrayList<>());
+                final List<Quad[]> lods = partLods.computeIfAbsent(node.name(), k -> new ArrayList<>());
                 while (lods.size() <= lod) {
                     lods.add(new Quad[0]);
                 }
@@ -178,20 +203,37 @@ public final class GltfModel {
         }
 
         for (Map.Entry<String, List<Quad[]>> e : partLods.entrySet()) {
-            final Quad[] lod0 = e.getValue().get(0);
+            // Недостающие уровни (нет LOD1/LOD2 файлов) догенерируем
+            // из LOD0: MeshSimplifier режет треугольники вдвое на уровень.
+            // Файлы из Blender имеют приоритет — генерация только для дыр.
+            final List<Quad[]> completed = LODGenerator.completeMeshLods(e.getValue());
+            final Quad[] lod0 = completed.get(0);
             final float[] pivot = computePivot(lod0);
-            model.parts.put(e.getKey(),
-                    new Part(e.getKey(), e.getValue(), pivot[0], pivot[1], pivot[2]));
+            model.parts.put(e.getKey(), new Part(e.getKey(), completed, pivot[0], pivot[1], pivot[2]));
             // Диагностика: размеры частей после нод-матриц и фита.
-            TorqueFoundry.LOGGER.info("glTF node '{}': bbox {} px, {} tris",
-                    e.getKey(), java.util.Arrays.toString(bboxSize(lod0)), lod0.length);
+            final String lodInfo = completed.size() + " lods, tris=" + trisPerLod(completed);
+            TorqueFoundry.LOGGER.info("glTF node '{}': bbox {} px, {}", e.getKey(),
+                    Arrays.toString(bboxSize(lod0)), lodInfo);
         }
-        TorqueFoundry.LOGGER.info("glTF model: scale={} px/unit, fit={}",
-                finalScale, fitToBlock ? "on" : "off");
+        TorqueFoundry.LOGGER.info("glTF model: scale={} px/unit, fit={}", finalScale,
+                fitToBlock ? "on" : "off");
         return model;
     }
 
-    /** Часть + её квады одного LOD-файла. */
+    private static String trisPerLod(List<Quad[]> lods) {
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lods.size(); i++) {
+            if (i > 0) {
+                sb.append('/');
+            }
+            sb.append(lods.get(i).length);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Часть + её квады одного LOD-файла.
+     */
     private record NodeBuild(String name, Quad[] quads) {
     }
 
@@ -250,7 +292,7 @@ public final class GltfModel {
                 float ny = m[1] * x + m[5] * y + m[9] * z;
                 float nz = m[2] * x + m[6] * y + m[10] * z;
                 final float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-                if (len > 1e-9F) {
+                if (len > MIN_NORMAL_LENGTH) {
                     nx /= len;
                     ny /= len;
                     nz /= len;
@@ -284,9 +326,15 @@ public final class GltfModel {
         float minZ = Float.MAX_VALUE;
         for (Quad q : quads) {
             for (Vertex v : q.vertices) {
-                if (v.x < minX) minX = v.x;
-                if (v.y < minY) minY = v.y;
-                if (v.z < minZ) minZ = v.z;
+                if (v.x < minX) {
+                    minX = v.x;
+                }
+                if (v.y < minY) {
+                    minY = v.y;
+                }
+                if (v.z < minZ) {
+                    minZ = v.z;
+                }
             }
         }
         return new float[]{minX, minY, minZ};
@@ -298,9 +346,15 @@ public final class GltfModel {
         float maxZ = -Float.MAX_VALUE;
         for (Quad q : quads) {
             for (Vertex v : q.vertices) {
-                if (v.x > maxX) maxX = v.x;
-                if (v.y > maxY) maxY = v.y;
-                if (v.z > maxZ) maxZ = v.z;
+                if (v.x > maxX) {
+                    maxX = v.x;
+                }
+                if (v.y > maxY) {
+                    maxY = v.y;
+                }
+                if (v.z > maxZ) {
+                    maxZ = v.z;
+                }
             }
         }
         return new float[]{maxX, maxY, maxZ};
@@ -312,34 +366,23 @@ public final class GltfModel {
         return new float[]{max[0] - min[0], max[1] - min[1], max[2] - min[2]};
     }
 
-    /** Р¦РµРЅС‚СЂ bounding box РєРІР°РґРѕРІ вЂ” pivot РІСЂР°С‰РµРЅРёСЏ С‡Р°СЃС‚Рё. */
+    /**
+     * Центр bounding box квадов — pivot вращения части.
+     */
     private static float[] computePivot(Quad[] quads) {
         if (quads.length == 0) {
-            return new float[]{8, 8, 8};
+            return EMPTY_PART_PIVOT.clone();
         }
-        float minX = Float.MAX_VALUE;
-        float minY = Float.MAX_VALUE;
-        float minZ = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE;
-        float maxY = -Float.MAX_VALUE;
-        float maxZ = -Float.MAX_VALUE;
-        for (Quad q : quads) {
-            for (Vertex v : q.vertices) {
-                if (v.x < minX) minX = v.x;
-                if (v.y < minY) minY = v.y;
-                if (v.z < minZ) minZ = v.z;
-                if (v.x > maxX) maxX = v.x;
-                if (v.y > maxY) maxY = v.y;
-                if (v.z > maxZ) maxZ = v.z;
-            }
-        }
-        return new float[]{(minX + maxX) * 0.5F, (minY + maxY) * 0.5F, (minZ + maxZ) * 0.5F};
+        final float[] min = bboxMin(quads);
+        final float[] max = bboxMax(quads);
+        return new float[]{(min[0] + max[0]) * 0.5F, (min[1] + max[1]) * 0.5F,
+                (min[2] + max[2]) * 0.5F};
     }
 
     /**
-     * РўСЂРёР°РЅРіСѓР»СЏС†РёСЏ: РєР°Р¶РґС‹Рµ 3 РІРµСЂС€РёРЅС‹ = С‚СЂРµСѓРіРѕР»СЊРЅРёРє -> Quad СЃ РІС‹СЂРѕР¶РґРµРЅРЅРѕР№
-     * 4-Р№ РІРµСЂС€РёРЅРѕР№ (d = c). РџРѕСЂСЏРґРѕРє CCW СЃРѕС…СЂР°РЅСЏРµС‚СЃСЏ, РЅРѕСЂРјР°Р»Рё РёР· glTF
-     * (РёР»Рё РІС‹С‡РёСЃР»РµРЅРЅС‹Рµ, РµСЃР»Рё РёС… РЅРµС‚).
+     * Триангуляция: каждые 3 вершины = треугольник -> Quad с вырожденной
+     * 4-й вершиной (d = c). Порядок CCW сохраняется, нормали из glTF
+     * (или вычисленные, если их нет).
      */
     private static List<Quad> trianglesToQuads(GltfParser.RawPrimitive prim, float scale) {
         final int triCount = prim.positions().length / 9;
@@ -351,15 +394,8 @@ public final class GltfModel {
             if (prim.normals() == null) {
                 computeFlatNormal(a, b, c);
             }
-            final Vertex d = new Vertex();
-            d.x = c.x;
-            d.y = c.y;
-            d.z = c.z;
-            d.normalX = c.normalX;
-            d.normalY = c.normalY;
-            d.normalZ = c.normalZ;
-            d.u = c.u;
-            d.v = c.v;
+            // d дублирует c: формат Quad всегда 4 вершины.
+            final Vertex d = copyVertex(c);
             final Quad q = new Quad();
             q.vertices = new Vertex[]{a, b, c, d};
             q.invertNormal = false;
@@ -368,12 +404,25 @@ public final class GltfModel {
         return out;
     }
 
+    private static Vertex copyVertex(Vertex src) {
+        final Vertex v = new Vertex();
+        v.x = src.x;
+        v.y = src.y;
+        v.z = src.z;
+        v.normalX = src.normalX;
+        v.normalY = src.normalY;
+        v.normalZ = src.normalZ;
+        v.u = src.u;
+        v.v = src.v;
+        return v;
+    }
+
     private static Vertex vertex(GltfParser.RawPrimitive prim, int index, float scale) {
         final Vertex v = new Vertex();
-        // glTF: РјРµС‚СЂС‹, Y-up, +Z Рє Р·СЂРёС‚РµР»СЋ. Р‘Р»РѕРє: РїРёРєСЃРµР»Рё, Y-up, -Z СЃРµРІРµСЂ.
-        // РџРѕРІРѕСЂРѕС‚ РЅР° 180 РІРѕРєСЂСѓРі Y (x=-x, z=-z): СЃС‚СЂРѕРєР° "z=-z" Р‘Р•Р— x=-x Р±С‹Р»Р°
-        // Р±С‹ РѕС‚СЂР°Р¶РµРЅРёРµРј вЂ” winding С‚СЂРµСѓРіРѕР»СЊРЅРёРєРѕРІ РёРЅРІРµСЂС‚РёСЂСѓРµС‚СЃСЏ Рё cull
-        // РѕС‚СЃРµРєР°РµС‚ РЅР°СЂСѓР¶РЅС‹Рµ РіСЂР°РЅРё (РјРѕРґРµР»СЊ "РІС‹РІРµСЂРЅСѓС‚Р°").
+        // glTF: метры, Y-up, +Z к зрителю. Блок: пиксели, Y-up, -Z север.
+        // Поворот на 180 вокруг Y (x=-x, z=-z): строка "z=-z" БЕЗ x=-x была
+        // бы отражением — winding треугольников инвертируется и cull
+        // отсекает наружные грани (модель "вывернута").
         v.x = -prim.positions()[index * 3] * scale;
         v.y = prim.positions()[index * 3 + 1] * scale;
         v.z = -prim.positions()[index * 3 + 2] * scale;
@@ -392,7 +441,9 @@ public final class GltfModel {
         return v;
     }
 
-    /** РџР»РѕСЃРєР°СЏ РЅРѕСЂРјР°Р»СЊ С‚СЂРµСѓРіРѕР»СЊРЅРёРєР° (РєРѕРіРґР° РІ glTF РЅРѕСЂРјР°Р»РµР№ РЅРµС‚). */
+    /**
+     * Плоская нормаль треугольника (когда в glTF нормалей нет).
+     */
     private static void computeFlatNormal(Vertex a, Vertex b, Vertex c) {
         final float ux = b.x - a.x;
         final float uy = b.y - a.y;
@@ -404,7 +455,7 @@ public final class GltfModel {
         float ny = uz * vx - ux * vz;
         float nz = ux * vy - uy * vx;
         final float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (len < 1e-9F) {
+        if (len < MIN_NORMAL_LENGTH) {
             nx = 0;
             ny = 1;
             nz = 0;
@@ -424,4 +475,3 @@ public final class GltfModel {
         c.normalZ = nz;
     }
 }
-

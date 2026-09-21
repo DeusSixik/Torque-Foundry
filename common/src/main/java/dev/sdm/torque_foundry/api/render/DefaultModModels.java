@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.core.client.models;
+package dev.sdm.torque_foundry.api.render;
 
 import dev.sdm.torque_foundry.core.client.render.gltf.GltfModel;
 import dev.sdm.torque_foundry.core.client.render.gltf.GltfModels;
