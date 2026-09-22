@@ -8,19 +8,22 @@ import dev.sdm.torque_foundry.physics.simulation.PhysicsPipeline;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Жизненный цикл групп:
- * - старт сервера: сброс in-memory групп + запуск потока физики;
+ * - старт сервера: сброс in-memory групп + запуск пула физики;
  * - пересоздание групп происходит лениво, тикерами BlockEntity
  *   по мере загрузки чанков (см. MechanicalBlockEntity#serverTick);
- * - каждый серверный тик: физика группы (поток физики опережает сервер);
+ * - каждый серверный тик: физика групп (воркеры пула опережают сервер);
  * - вход игрока: полная синхронизация групп клиенту.
  */
 public final class MechanicalGroupEvents {
 
     private static volatile PhysicsPipeline physicsPipeline;
+    private static volatile ExecutorService physicsExecutor;
 
     /**
      * Период полного синка групп клиентам (в тиках). Подстраховка на случай
@@ -29,20 +32,29 @@ public final class MechanicalGroupEvents {
      */
     private static final int PERIODIC_SYNC_INTERVAL = 40;
 
+    /**
+     * Воркеры физики: половина ядер, зажата в 1..4 — физика групп лёгкая
+     * (микросекунды на группу), большего параллелизма не требуется,
+     * а лишние треды греют планировщик (см. док, Ф3).
+     */
+    private static final int PHYSICS_THREADS =
+            Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+
     private static int tickCounter;
 
     public static void register() {
         LifecycleEvent.SERVER_STARTING.register(server -> {
             MechanicalGroupManager.clearAll();
 
-            // Один поток физики по умолчанию; поток-демон, чтобы не держать JVM
-            final PhysicsPipeline pipeline = new PhysicsPipeline(1, Executors.newSingleThreadExecutor(r -> {
-                final Thread thread = new Thread(r, "TorqueFoundry-Physics");
+            // Пул физики: потоки-демоны, чтобы не держать JVM.
+            final AtomicInteger seq = new AtomicInteger();
+            physicsExecutor = Executors.newFixedThreadPool(PHYSICS_THREADS, r -> {
+                final Thread thread =
+                        new Thread(r, "TorqueFoundry-Physics-" + seq.incrementAndGet());
                 thread.setDaemon(true);
                 return thread;
-            }));
-            pipeline.start();
-            physicsPipeline = pipeline;
+            });
+            physicsPipeline = new PhysicsPipeline(PHYSICS_THREADS, physicsExecutor);
         });
 
         TickEvent.SERVER_POST.register(server -> {
@@ -79,8 +91,13 @@ public final class MechanicalGroupEvents {
             final PhysicsPipeline pipeline = physicsPipeline;
             if (pipeline != null) {
                 pipeline.stop();
-                physicsPipeline = null;
             }
+            final ExecutorService executor = physicsExecutor;
+            if (executor != null) {
+                executor.shutdownNow();
+            }
+            physicsPipeline = null;
+            physicsExecutor = null;
         });
 
         PlayerEvent.PLAYER_JOIN.register(TFNetworking::syncAllGroups);

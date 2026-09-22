@@ -1,6 +1,7 @@
 package dev.sdm.torque_foundry.physics.group;
 
 
+import dev.sdm.torque_foundry.api.physics.GroupSnapshotView;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.physics.PhysicsMath;
 import dev.sdm.torque_foundry.physics.RotationalPower;
@@ -8,6 +9,7 @@ import dev.sdm.torque_foundry.physics.WorkState;
 import dev.sdm.torque_foundry.physics.hook.PhysicsHook;
 import dev.sdm.torque_foundry.physics.hook.PhysicsHooks;
 import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
+import dev.sdm.torque_foundry.physics.simulation.GroupSnapshot;
 import dev.sdm.torque_foundry.physics.simulation.SimulationContext;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -19,7 +21,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Группа машин = жёстко сцепленная сеть. Физика считается как DAG передачи
@@ -59,6 +63,16 @@ public class MechanicalGroup {
      */
     public double getCurrentSpeedRpm() {
         return currentSpeedRaw / 1000.0;
+    }
+
+    /** Обороты сети, milli-RPM (публикация снапшота; живое значение). */
+    public long getNetSpeedRaw() {
+        return currentSpeedRaw;
+    }
+
+    /** Счётчик физических тиков группы (id публикуемого снапшота). */
+    public long getSimTick() {
+        return simTick;
     }
 
     /**
@@ -102,6 +116,18 @@ public class MechanicalGroup {
      */
     private int directionConflictTicks = 0;
     private static final int DIRECTION_JAM_TICKS = 20;
+
+    // --- Снапшот (протокол «Concurrency in Torque Foundry.md», §4) ---
+
+    /**
+     * Замок публикации снапшота. Пишет только владелец группы (воркер)
+     * в конце тика; читают серверный тред (блокирующе) и рендер (tryLock).
+     * Держится микросекунды (копия плоских массивов) — contention нет.
+     */
+    private final ReentrantLock snapshotLock = new ReentrantLock();
+
+    /** Опубликованный срез («front»). Пишет только владелец под замком. */
+    private final GroupSnapshot front = new GroupSnapshot();
 
     private static int[] ensureInt(int[] buffer, int size) {
         return buffer.length >= size ? buffer : new int[size];
@@ -403,6 +429,65 @@ public class MechanicalGroup {
      */
     public void computeTick() {
         new TickDriver().run();
+        publishSnapshot();
+    }
+
+    /**
+     * Публикация снапшота: копия живого состояния группы в front под замком.
+     * Вызывается владельцем (воркером) в конце тика; читатели получают
+     * согласованный срез через {@link #copySnapshotTo}. Фазы A–D остаются
+     * lock-free — замок берётся один раз после них.
+     */
+    private void publishSnapshot() {
+        snapshotLock.lock();
+        try {
+            front.publishFrom(this);
+        } finally {
+            snapshotLock.unlock();
+        }
+    }
+
+    /**
+     * Тест-хук: держит snapshotLock, пока тест не разрешит продолжение.
+     * Проверяет неблокирующий путь читателя (tryLock при занятом замке).
+     *
+     * @param locked замок захвачен — тест может проверять отказ
+     * @param release отпустить замок
+     */
+    public void holdSnapshotLockForTest(CountDownLatch locked, CountDownLatch release) {
+        snapshotLock.lock();
+        try {
+            locked.countDown();
+            release.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            snapshotLock.unlock();
+        }
+    }
+
+    /**
+     * Копия последнего опубликованного снапшота в буфер читателя.
+     * Публичное чтение — только через {@code PhysicsReads}; метод открыт
+     * пакету фасада (api.physics вызывает его из статических методов).
+     *
+     * @param into буфер читателя (переиспользуемый, растёт при росте группы)
+     * @param block true — ждать освобождения замка; false — tryLock,
+     *     занято → false, буфер читателя НЕ тронут (рендер-путь)
+     * @return true — во view лежит согласованный срез ({@code tickId >= 0})
+     */
+    public boolean copySnapshotTo(GroupSnapshotView into, boolean block) {
+        if (block) {
+            snapshotLock.lock();
+        } else if (!snapshotLock.tryLock()) {
+            return false;
+        }
+        try {
+            front.copyTo(into);
+            return true;
+        } finally {
+            snapshotLock.unlock();
+        }
     }
 
     /**

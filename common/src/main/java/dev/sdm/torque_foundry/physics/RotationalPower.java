@@ -26,7 +26,9 @@ public class RotationalPower {
         return from(speed, torque, direction.index);
     }
 
-    /** СИ-вход (RPM, Nm) — внутри умножается на SCALE. */
+    /**
+     * СИ-вход (RPM, Nm) — внутри умножается на SCALE.
+     */
     public static RotationalPower from(long speed, long torque, byte direction) {
         return new RotationalPower(
                 speed * PhysicsConstants.SCALE,
@@ -97,7 +99,9 @@ public class RotationalPower {
         this.setTorque(torque);
     }
 
-    /** СИ-вход (RPM) — внутри умножается на SCALE. */
+    /**
+     * СИ-вход (RPM) — внутри умножается на SCALE.
+     */
     public void setSpeed(long speed) {
         this.speed = speed * PhysicsConstants.SCALE;
     }
@@ -106,7 +110,9 @@ public class RotationalPower {
         this.speed = speed;
     }
 
-    /** СИ-вход (Nm) — внутри умножается на SCALE. */
+    /**
+     * СИ-вход (Nm) — внутри умножается на SCALE.
+     */
     public void setTorque(long torque) {
         this.torque = torque * PhysicsConstants.SCALE;
     }
@@ -143,12 +149,16 @@ public class RotationalPower {
         return this.torque / (double) PhysicsConstants.SCALE;
     }
 
-    /** Мощность в ваттах (double, для отображения). */
+    /**
+     * Мощность в ваттах (double, для отображения).
+     */
     public double getPowerWatts() {
         return (double) this.torque * this.speed * (2.0 * Math.PI / 60.0) / PhysicsConstants.SCALE_2;
     }
 
-    /** Мощность в ваттах (целочисленно, без потерь округления). */
+    /**
+     * Мощность в ваттах (целочисленно, без потерь округления).
+     */
     public long getPower() {
         return PhysicsMath.watts(this.torque, this.speed);
     }

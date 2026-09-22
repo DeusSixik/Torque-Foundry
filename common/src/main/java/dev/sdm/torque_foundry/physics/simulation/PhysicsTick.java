@@ -2,93 +2,57 @@ package dev.sdm.torque_foundry.physics.simulation;
 
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.LockSupport;
+import java.util.Arrays;
 
-public class PhysicsTick {
+/**
+ * Слот пайплайна: подмножество групп одного физического тика.
+ * Массив групп переиспользуется между тиками (рост — только при
+ * росте суммарной нагрузки), ноль аллокаций в установившемся режиме.
+ *
+ * <p>Инвариант I1 («Concurrency in Torque Foundry.md», §3): слот целиком
+ * исполняется ОДНОЙ задачей пула — группа не может тикаться двумя
+ * потоками, поскольку попадает ровно в один слот одной раскладки.
+ *
+ * <p>Выполняется в воркере пула физики, не на серверном треде.
+ */
+public final class PhysicsTick {
 
-    protected int groupsCount;
-    protected PendingData[] data;
-    // изначально "работа выполнена", чтобы первый await() серверного тика не завис
-    protected final AtomicBoolean done = new AtomicBoolean(true);
+    private static final int INITIAL_CAPACITY = 4;
 
-    public final void initialize(MechanicalGroup[] groups) {
-        this.groupsCount = groups.length;
-        PendingData[] data = this.data;
-        if (data == null || (groupsCount >= data.length)) {
-            createNew(groupsCount, groups);
-        } else
-            updateData(groupsCount, groups);
+    private MechanicalGroup[] groups = new MechanicalGroup[INITIAL_CAPACITY];
+    private int count;
 
-        done.set(false);
-    }
-
-    private void createNew(int groupsCount, MechanicalGroup[] groups) {
-        this.data = new PendingData[groupsCount];
-
-        for (int i = 0; i < groups.length; i++) {
-            PendingData pendingData = new PendingData();
-            pendingData.group = groups[i];
-            pendingData.result = new Result();
-            this.data[i] = pendingData;
-        }
-    }
-
-    private void updateData(int groupsCount, MechanicalGroup[] groups) {
-        final PendingData[] data = this.data;
-        for (int i = 0; i < groupsCount; i++) {
-            PendingData pendingData = data[i];
-            pendingData.group = groups[i];
-            pendingData.result.clear();
-        }
-    }
-
-    public final boolean isDone() {
-        return done.get();
-    }
-
-    public void await() {
-        int spins = 0;
-        while (!this.done.get()) {
-            if (spins < 1000) {
-                Thread.onSpinWait();
-                spins++;
-            } else {
-                LockSupport.parkNanos(50_000);
-            }
-        }
-    }
-
-    public void markDone() {
-        this.done.set(true);
+    /**
+     * Очистить слот перед раскладкой нового тика (серверный тред).
+     */
+    public void reset() {
+        count = 0;
     }
 
     /**
-     * Вычисление физики всех групп слота. Выполняется в потоке физики.
+     * Добавить группу в слот; между reset и compute (серверный тред).
+     */
+    public void append(MechanicalGroup group) {
+        if (count == groups.length) {
+            groups = Arrays.copyOf(groups, Math.max(INITIAL_CAPACITY, count * 2));
+        }
+        groups[count++] = group;
+    }
+
+    /**
+     * Тик всех групп слота: по очереди, целиком, в одном потоке-воркере.
+     * Публикация снапшотов — в конце тика каждой группы (её замок).
      */
     public void compute() {
-        final PendingData[] data = this.data;
-        if (data == null) {
-            markDone();
-            return;
-        }
-
-        for (int i = 0; i < groupsCount; i++) {
-            data[i].group.computeTick();
-        }
-
-        markDone();
-    }
-
-    public static class Result {
-
-        public void clear() {
-
+        for (int i = 0; i < count; i++) {
+            groups[i].computeTick();
         }
     }
 
-    protected static class PendingData {
-        MechanicalGroup group;
-        Result result;
+    /**
+     * Число групп в слоте (диагностика/тесты).
+     */
+    public int size() {
+        return count;
     }
 }

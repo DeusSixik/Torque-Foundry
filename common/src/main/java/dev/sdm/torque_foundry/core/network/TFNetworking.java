@@ -3,9 +3,8 @@ package dev.sdm.torque_foundry.core.network;
 import dev.architectury.networking.NetworkManager;
 import dev.architectury.platform.Platform;
 import dev.sdm.torque_foundry.TorqueFoundry;
+import dev.sdm.torque_foundry.api.physics.GroupSnapshotView;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
-import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.fabricmc.api.EnvType;
 import net.minecraft.core.BlockPos;
@@ -18,6 +17,13 @@ import java.util.List;
 public final class TFNetworking {
 
     private static final double SYNC_RADIUS_SQR = 64.0 * 64.0;
+
+    /**
+     * Буфер сборки payload из снапшота. Только серверный тред (все sync*
+     * вызываются из него): один переиспользуемый view — ноль аллокаций
+     * массивов на пакет, растёт только при росте групп.
+     */
+    private static final GroupSnapshotView SYNC_VIEW = new GroupSnapshotView();
 
     public static void register() {
         if (Platform.getEnv() == EnvType.CLIENT) {
@@ -85,28 +91,44 @@ public final class TFNetworking {
         }
     }
 
-    private static GroupSyncPayload buildPayload(MechanicalGroup group) {
-        final MechanicalMachine[] machines = group.getMachines();
-        final int size = Math.min(group.getSize(), machines.length);
+    /**
+     * Payload из опубликованного снапшота группы: копия под замком группы —
+     * данные всегда из ОДНОГО завершённого тика, гонки с потоком физики нет
+     * (раньше здесь читались живые машины на серверном треде).
+     *
+     * <p>View переиспользуется: серверный тред — единственный потребитель.
+     *
+     * @param group группа (публикация берётся её снапшотом)
+     * @return payload; если группа ещё ничего не публиковала (tickId < 0) —
+     *     payload без записей (клиент получит пустой состав, досыл будет)
+     */
+    static GroupSyncPayload buildPayload(MechanicalGroup group) {
+        if (!group.copySnapshotTo(SYNC_VIEW, true) || SYNC_VIEW.tickId < 0) {
+            return new GroupSyncPayload(group.getGroupId(), 0, List.of());
+        }
+        return buildPayload(SYNC_VIEW);
+    }
 
-        final List<GroupSyncPayload.Entry> entries = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            final MechanicalMachine machine = machines[i];
-            if (machine == null || machine.getBlockPos() == null) {
+    /**
+     * Сборка payload из снапшота. Пакетно-private: тесты сверяют маппинг
+     * view -> entries. Пустые слоты (posLong == 0) пропускаются.
+     */
+    static GroupSyncPayload buildPayload(GroupSnapshotView view) {
+        final List<GroupSyncPayload.Entry> entries =
+                new ArrayList<>(view.machineCount);
+        for (int i = 0; i < view.machineCount; i++) {
+            if (view.posLong[i] == 0L) {
                 continue;
             }
-
-            final RotationalPower received = machine.getReceived();
             entries.add(new GroupSyncPayload.Entry(
-                    machine.getBlockPos(),
-                    machine.getGroupElementIndex(),
-                    machine.getWorkState().ordinal(),
-                    received.getSpeedRaw(),
-                    received.getTorqueRaw(),
-                    received.getDirection()));
+                    BlockPos.of(view.posLong[i]),
+                    i,
+                    view.states[i].ordinal(),
+                    view.receivedSpeedRaw[i],
+                    view.receivedTorqueRaw[i],
+                    view.receivedDirection[i]));
         }
-
-        return new GroupSyncPayload(group.getGroupId(), group.getSize(), entries);
+        return new GroupSyncPayload(view.groupId, view.machineCount, entries);
     }
 
     /**

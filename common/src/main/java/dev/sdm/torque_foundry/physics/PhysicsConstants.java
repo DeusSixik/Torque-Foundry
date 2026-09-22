@@ -6,10 +6,14 @@ package dev.sdm.torque_foundry.physics;
  */
 public final class PhysicsConstants {
 
-    /** Сетевой масштаб: 1 RPM = 1000 milli-RPM, 1 Nm = 1000 milli-Nm. */
+    /**
+     * Сетевой масштаб: 1 RPM = 1000 milli-RPM, 1 Nm = 1000 milli-Nm.
+     */
     public static final int SCALE = 1000;
 
-    /** SCALE² — для целочисленного расчёта мощности. */
+    /**
+     * SCALE² — для целочисленного расчёта мощности.
+     */
     public static final int SCALE_2 = SCALE * SCALE;
 
     /**

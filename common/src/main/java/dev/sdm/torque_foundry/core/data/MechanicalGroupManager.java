@@ -60,6 +60,16 @@ public final class MechanicalGroupManager {
     }
 
     /**
+     * Зарегистрировать готовую группу (тесты, будущие recovery-сценарии).
+     * Игровой путь — {@link #createOrAdd}: он же строит топологию.
+     *
+     * @param group группа с уникальным id
+     */
+    public static synchronized void register(MechanicalGroup group) {
+        GROUPS_BY_ID.put(group.getGroupId(), group);
+    }
+
+    /**
      * Снапшот групп для физического тика (снимается под блокировкой).
      * values() — живой view мапы: без копии в массив итерация
      * в потоке физики упадёт с CME при мутации с серверного треда.
