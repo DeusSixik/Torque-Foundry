@@ -1,9 +1,12 @@
 package dev.sdm.torque_foundry.api.block;
 
+import dev.sdm.torque_foundry.core.client.render.PortFaceOverlay;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.core.network.TFNetworking;
 import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
+import dev.sdm.torque_foundry.physics.material.PhysicsMaterial;
+import dev.sdm.torque_foundry.physics.material.PhysicsMaterials;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -32,8 +35,8 @@ public abstract class MechanicalBlock extends BaseEntityBlock {
      * Физический материал машины для этого blockstate (по умолчанию — железо).
      * Переопределяется блоками со свойством MATERIAL (вал).
      */
-    public dev.sdm.torque_foundry.physics.material.PhysicsMaterial materialOf(BlockState state) {
-        return dev.sdm.torque_foundry.physics.material.PhysicsMaterials.DEFAULT;
+    public PhysicsMaterial materialOf(BlockState state) {
+        return PhysicsMaterials.DEFAULT;
     }
 
     @Override
@@ -47,7 +50,7 @@ public abstract class MechanicalBlock extends BaseEntityBlock {
 
         if (level.isClientSide) {
             // Клиент: запускаем свечение портов после установки.
-            dev.sdm.torque_foundry.core.client.render.PortFaceOverlay.markPlaced(blockPos);
+            PortFaceOverlay.markPlaced(blockPos);
             return;
         }
 
