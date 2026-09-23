@@ -34,7 +34,9 @@ public class GearboxMachine extends MechanicalMachine {
         return outputSide == this.outputSide ? gearbox.transform(input) : input;
     }
 
-    /** КПД передачи (игровое значение класса). */
+    /**
+     * КПД передачи (игровое значение класса).
+     */
     @Override
     public double getEfficiency() {
         return 0.95;

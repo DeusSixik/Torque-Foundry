@@ -1,5 +1,7 @@
 package dev.sdm.torque_foundry.api.block;
 
+import dev.sdm.torque_foundry.api.debug.DebugInfoCollector;
+import dev.sdm.torque_foundry.api.debug.DebugInfoProvider;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.core.network.ClientGroupCache;
 import dev.sdm.torque_foundry.core.network.TFNetworking;
@@ -15,14 +17,26 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
-public class MechanicalBlockEntity extends BlockEntity {
+public class MechanicalBlockEntity extends BlockEntity implements DebugInfoProvider {
+
+    /**
+     * Отладочные метрики БЛОКА (BE-уровень) для TF Inspector: то, чего нет
+     * в машине (инвентарь, NBT-состояние, валидность). Секция уже выбрана
+     * вызывающим (имя класса BE) — можно писать сразу {@code add(...)}.
+     *
+     * <p>Тредовый контракт: рендер-тред (см. DebugInfoProvider). Данные
+     * физики читайте через машину — здесь они дублируют её секции.
+     */
+    @Override
+    public void addDebugInfo(DebugInfoCollector collector) {
+    }
 
     public final MechanicalMachine machine;
 
     public MechanicalBlockEntity(BlockEntityType<?> blockEntityType, BlockPos blockPos, BlockState blockState) {
         super(blockEntityType, blockPos, blockState);
 
-        if(!(blockState.getBlock() instanceof MechanicalBlock block)) {
+        if (!(blockState.getBlock() instanceof MechanicalBlock block)) {
             throw new IllegalArgumentException("MechanicalBlocks only support MechanicalBlocks");
         }
 

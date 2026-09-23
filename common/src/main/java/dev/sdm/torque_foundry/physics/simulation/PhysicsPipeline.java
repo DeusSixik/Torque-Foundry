@@ -1,6 +1,7 @@
 package dev.sdm.torque_foundry.physics.simulation;
 
 import dev.sdm.torque_foundry.TorqueFoundry;
+import dev.sdm.torque_foundry.api.events.physics.PhysicsEventDispatcher;
 import dev.sdm.torque_foundry.api.physics.PhysicsTasks;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
@@ -49,6 +50,10 @@ public final class PhysicsPipeline {
     private Future<?>[] pending = new Future<?>[0];
     private int pendingCount;
 
+    /** Параметры последнего запущенного цикла (для события COMPLETED). */
+    private int lastGroupCount;
+    private int lastSlots;
+
     public PhysicsPipeline(int numberThreads, ExecutorService executor) {
         if (numberThreads <= 0) {
             throw new IllegalArgumentException("numberThreads must be positive");
@@ -67,8 +72,9 @@ public final class PhysicsPipeline {
      * снапшотами групп — для них данные всегда согласованны.
      */
     public void tick() {
-        // 1. таски прошлого тика обязаны завершиться до перераскладки
-        awaitAll();
+        // 1. таски прошлого тика обязаны завершиться до перераскладки.
+        //    По завершении — событие COMPLETED (данные снапшотов цикла).
+        awaitCycle();
 
         // 2. mailbox-заявки: физика спит — группы не тикаются, задачи
         //    исполняются владельцами безопасно и детерминированно.
@@ -83,7 +89,10 @@ public final class PhysicsPipeline {
 
         // 4. раскладка по слотам + запуск
         final int slots = distribute(groups);
+        lastGroupCount = groups.length;
+        lastSlots = slots;
         submit(slots);
+        PhysicsEventDispatcher.fireCycleSubmitted(groups.length, slots);
     }
 
     /**
@@ -91,7 +100,20 @@ public final class PhysicsPipeline {
      * Пул останавливает владелец ({@code ExecutorService.shutdownNow}).
      */
     public void stop() {
+        awaitCycle();
+    }
+
+    /**
+     * Барьер цикла: дождаться тасков и, если что-то ждали, стрельнуть
+     * CYCLE_COMPLETED (данные снапшотов цикла согласованы). Общий для
+     * tick() и stop(): завершение цикла — семантика барьера, а не тика.
+     */
+    private void awaitCycle() {
+        final boolean hadPending = pendingCount > 0;
         awaitAll();
+        if (hadPending) {
+            PhysicsEventDispatcher.fireCycleCompleted(lastGroupCount, lastSlots);
+        }
     }
 
     /**

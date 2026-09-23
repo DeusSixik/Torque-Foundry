@@ -51,7 +51,9 @@ public class TransferCaseMachine extends MechanicalMachine {
         return input;
     }
 
-    /** КПД передачи (игровое значение класса). */
+    /**
+     * КПД передачи (игровое значение класса).
+     */
     @Override
     public double getEfficiency() {
         return 0.94;

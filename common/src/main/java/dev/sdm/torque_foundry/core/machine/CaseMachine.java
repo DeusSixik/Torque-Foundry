@@ -19,7 +19,9 @@ import net.minecraft.core.Direction;
  */
 public class CaseMachine extends MechanicalMachine {
 
-    /** Материал вставленного вала (null — корпус пуст). */
+    /**
+     * Материал вставленного вала (null — корпус пуст).
+     */
     private PhysicsMaterial shaftMaterial = null;
 
     public CaseMachine() {
@@ -28,17 +30,23 @@ public class CaseMachine extends MechanicalMachine {
         enableBearingSlots();
     }
 
-    /** Вставлен ли вал. */
+    /**
+     * Вставлен ли вал.
+     */
     public boolean hasShaft() {
         return shaftMaterial != null;
     }
 
-    /** Материал вставки (null — пусто). */
+    /**
+     * Материал вставки (null — пусто).
+     */
     public PhysicsMaterial getShaftMaterial() {
         return shaftMaterial;
     }
 
-    /** Установить вал-вставку: материал, порты по оси, пассивный режим. */
+    /**
+     * Установить вал-вставку: материал, порты по оси, пассивный режим.
+     */
     public void setShaft(PhysicsMaterial material) {
         if (material == null) {
             clearShaft();
@@ -50,7 +58,9 @@ public class CaseMachine extends MechanicalMachine {
         applyAxisPorts();
     }
 
-    /** Извлечь вал: порты гаснут, материал сбрасывается на корпусной. */
+    /**
+     * Извлечь вал: порты гаснут, материал сбрасывается на корпусной.
+     */
     public void clearShaft() {
         shaftMaterial = null;
         setPassive(false);
@@ -58,7 +68,9 @@ public class CaseMachine extends MechanicalMachine {
         setMaterial(PhysicsMaterials.DEFAULT);
     }
 
-    /** Вал-вставка: износ по оборотам/моменту применяется (ShaftWearHook). */
+    /**
+     * Вал-вставка: износ по оборотам/моменту применяется (ShaftWearHook).
+     */
     @Override
     public boolean isShaftSegment() {
         return hasShaft();

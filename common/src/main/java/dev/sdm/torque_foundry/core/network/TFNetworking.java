@@ -146,8 +146,8 @@ public final class TFNetworking {
             }
         }
 
-        TorqueFoundry.LOGGER.info("[TF-SYNC] send: groupId={}, members={}, entries={}, targets={}",
-                payload.groupId(), payload.memberCount(), payload.entries().size(), targets.size());
+//        TorqueFoundry.LOGGER.info("[TF-SYNC] send: groupId={}, members={}, entries={}, targets={}",
+//                payload.groupId(), payload.memberCount(), payload.entries().size(), targets.size());
 
         if (!targets.isEmpty()) {
             NetworkManager.sendToPlayers(targets, payload);

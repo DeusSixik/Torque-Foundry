@@ -77,6 +77,18 @@ public class FlywheelMachine extends MechanicalMachine {
         return energy / capacity;
     }
 
+    /** Секция Flywheel: запас энергии маховика. */
+    @Override
+    public void addDebugInfo(dev.sdm.torque_foundry.api.debug.DebugInfoCollector collector) {
+        super.addDebugInfo(collector);
+        collector.section("Flywheel")
+                .entryKey("Flywheel.energy", "Stored energy",
+                        String.format(java.util.Locale.ROOT, "%.1f / %.0f J (%.0f%%)",
+                                getEnergy(), getCapacity(), getFill() * 100),
+                        false, (float) getFill(),
+                        "Заряд от излишка сети, разряд покрывает дефицит момента");
+    }
+
     /**
      * Поддержка момента: если вход даёт меньше паспортного момента маховика,
      * разница покрывается из запаса (пока хватает энергии).

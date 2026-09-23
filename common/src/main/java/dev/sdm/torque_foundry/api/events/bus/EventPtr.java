@@ -8,6 +8,11 @@ public class EventPtr<T> {
         this.eventType = eventType;
     }
 
+    /** Тип события на шине (для firing из мест-источников). */
+    public FastEventBus.EventType<T> type() {
+        return eventType;
+    }
+
     public EventSubscription subscribe(FastEventBus.EventListener<T> listener) {
         return FastEventBus.DEFAULT_BUS.subscribe(eventType, listener);
     }

@@ -2,6 +2,7 @@ package dev.sdm.torque_foundry.api.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import dev.sdm.torque_foundry.api.access.BlockEntityAccess;
 import dev.sdm.torque_foundry.core.block.CaseBlockEntity;
 import dev.sdm.torque_foundry.core.block.ShaftBlockEntity;
 import dev.sdm.torque_foundry.core.block.TFBlocks;
@@ -124,6 +125,8 @@ public final class MechanicalItemRenderer extends BlockEntityWithoutLevelRendere
         if(be == null) {
             return;
         }
+
+        ((BlockEntityAccess)be).tq$setPos(gameRenderer.getMainCamera().getBlockPosition());
 
         final BlockEntityRenderer<BlockEntity> ber =
                 mc.getBlockEntityRenderDispatcher().getRenderer(be);

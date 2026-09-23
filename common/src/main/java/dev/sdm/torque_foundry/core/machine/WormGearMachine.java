@@ -40,7 +40,9 @@ public class WormGearMachine extends MechanicalMachine {
         return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, input.getDirection());
     }
 
-    /** КПД передачи (игровое значение класса). */
+    /**
+     * КПД передачи (игровое значение класса).
+     */
     @Override
     public double getEfficiency() {
         return 0.75;

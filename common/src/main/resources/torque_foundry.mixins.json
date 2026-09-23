@@ -1,11 +1,12 @@
 {
   "required": true,
-  "package": "dev.sdm.torque_foundry.mixin",
+  "package": "dev.sdm.torque_foundry.core.mixin",
   "compatibilityLevel": "JAVA_21",
   "minVersion": "0.8",
   "client": [
   ],
   "mixins": [
+    "MixinBlockEntity$mutable_pos"
   ],
   "injectors": {
     "defaultRequire": 1

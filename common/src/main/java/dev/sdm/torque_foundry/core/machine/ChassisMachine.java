@@ -1,5 +1,6 @@
 package dev.sdm.torque_foundry.core.machine;
 
+import dev.sdm.torque_foundry.api.debug.DebugInfoCollector;
 import dev.sdm.torque_foundry.core.item.GearItem;
 import dev.sdm.torque_foundry.physics.RotationDirection;
 import dev.sdm.torque_foundry.physics.RotationalPower;
@@ -28,10 +29,14 @@ public class ChassisMachine extends MechanicalMachine {
     private Direction inputSide = Direction.NORTH;
     private Direction outputSide = Direction.SOUTH;
 
-    /** Зубья установленной шестерни (0 — не шестерня). */
+    /**
+     * Зубья установленной шестерни (0 — не шестерня).
+     */
     private int teeth = 0;
 
-    /** Режим вала: шасси = проходной вал из материала. */
+    /**
+     * Режим вала: шасси = проходной вал из материала.
+     */
     private PhysicsMaterial shaftMaterial = null;
 
     public ChassisMachine() {
@@ -44,12 +49,16 @@ public class ChassisMachine extends MechanicalMachine {
         // Порты пересобираются в rebuildPorts()
     }
 
-    /** Есть ли вставка (шестерня или вал). */
+    /**
+     * Есть ли вставка (шестерня или вал).
+     */
     public boolean hasCore() {
         return teeth > 0 || shaftMaterial != null;
     }
 
-    /** Режим вала (шасси = проходной вал). */
+    /**
+     * Режим вала (шасси = проходной вал).
+     */
     public boolean isShaftMode() {
         return teeth == 0 && shaftMaterial != null;
     }
@@ -58,12 +67,16 @@ public class ChassisMachine extends MechanicalMachine {
         return teeth;
     }
 
-    /** Материал вала-вставки (null — не вал). */
+    /**
+     * Материал вала-вставки (null — не вал).
+     */
     public PhysicsMaterial getShaftMaterial() {
         return shaftMaterial;
     }
 
-    /** Вал-вставка: износ по оборотам/моменту применяется (ShaftWearHook). */
+    /**
+     * Вал-вставка: износ по оборотам/моменту применяется (ShaftWearHook).
+     */
     @Override
     public boolean isShaftSegment() {
         return isShaftMode();
@@ -99,7 +112,9 @@ public class ChassisMachine extends MechanicalMachine {
         rebuildPorts();
     }
 
-    /** Установить вал-вставку: шасси = проходной вал из материала. */
+    /**
+     * Установить вал-вставку: шасси = проходной вал из материала.
+     */
     public void setShaft(PhysicsMaterial material) {
         if (material == null) {
             clearCore();
@@ -112,7 +127,9 @@ public class ChassisMachine extends MechanicalMachine {
         rebuildPorts();
     }
 
-    /** Извлечь ядро (шасси пусто). */
+    /**
+     * Извлечь ядро (шасси пусто).
+     */
     public void clearCore() {
         teeth = 0;
         shaftMaterial = null;
@@ -120,7 +137,9 @@ public class ChassisMachine extends MechanicalMachine {
         clearPorts();
     }
 
-    /** Поворот блока: мировые стороны входа/выхода следуют за FACING. */
+    /**
+     * Поворот блока: мировые стороны входа/выхода следуют за FACING.
+     */
     @Override
     public void setFacing(Direction facing) {
         super.setFacing(facing);
@@ -180,5 +199,29 @@ public class ChassisMachine extends MechanicalMachine {
         // Внешнее зацепление реверсирует вращение
         return RotationalPower.fromRaw(outSpeedRaw, Math.max(0, outTorqueRaw),
                 RotationDirection.opposite(input.getDirection()));
+    }
+
+    /**
+     * Секция Chassis: вставка (шестерня/вал) и её рейтинги.
+     */
+    @Override
+    public void addDebugInfo(DebugInfoCollector collector) {
+        super.addDebugInfo(collector);
+        collector.section("Chassis");
+        if (!hasCore()) {
+            collector.alertKey("Chassis.core", "Core", "empty (open box, no power)", true);
+            return;
+        }
+        if (isShaftMode()) {
+            collector.addKey("Chassis.core", "Core",
+                    "shaft insert: " + getShaftMaterial().name());
+        } else {
+            collector.addKey("Chassis.core", "Core",
+                    "gear: " + teeth + " teeth, " + getMaterial().name());
+            collector.hintKey("Chassis.ratio", "Ratio",
+                    GearItem.DRIVE_TEETH + "/" + teeth + " (drive pinion "
+                            + GearItem.DRIVE_TEETH + "T, external mesh reverses)",
+                    "Больше зубьев — ниже обороты, выше момент");
+        }
     }
 }

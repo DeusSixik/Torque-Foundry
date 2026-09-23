@@ -1,6 +1,7 @@
 package dev.sdm.torque_foundry.core.block;
 
 import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
+import dev.sdm.torque_foundry.api.debug.DebugInfoCollector;
 import dev.sdm.torque_foundry.core.item.ShaftPartItem;
 import dev.sdm.torque_foundry.core.machine.CaseMachine;
 import dev.sdm.torque_foundry.physics.RotationalPower;
@@ -66,6 +67,15 @@ public class CaseBlockEntity extends MechanicalBlockEntity {
         } else {
             casing.setShaft(ShaftPartItem.materialOf(shaft));
         }
+    }
+
+    /**
+     * BE-уровень отладки: слот вставки (ItemStack) живёт в BE, не в машине —
+     * инспектор показывает его через addDebugInfo (TF Inspector, клавиша N).
+     */
+    @Override
+    public void addDebugInfo(DebugInfoCollector collector) {
+        collector.add("Shaft insert", shaft.isEmpty() ? "empty" : shaft.getHoverName().getString());
     }
 
     // --- Синк на клиент (рендер Val + оверлей портов) ---

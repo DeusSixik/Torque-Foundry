@@ -1,25 +1,24 @@
 package dev.sdm.torque_foundry.debug.physics;
 
-import dev.sdm.torque_foundry.core.machine.ChassisMachine;
-import dev.sdm.torque_foundry.core.machine.FlywheelMachine;
-import dev.sdm.torque_foundry.core.machine.GeneratorMachine;
-import dev.sdm.torque_foundry.physics.RotationalPower;
-import dev.sdm.torque_foundry.physics.machine.Bearing;
-import dev.sdm.torque_foundry.physics.machine.LubricantState;
+import dev.sdm.torque_foundry.api.block.MechanicalBlockEntity;
+import dev.sdm.torque_foundry.api.debug.DebugInfoCollector;
 import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
-import dev.sdm.torque_foundry.physics.machine.SimulationState;
-import dev.sdm.torque_foundry.physics.material.PhysicsMaterial;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Снепшот всех показателей механического блока для отладочного инспектора.
  * Собирается раз за кадр из живой машины (клиент видит серверный снепшот
  * через ClientGroupCache) и раскладывается по секциям. Каждая метрика имеет
  * стабильный id вида "section.key" — он же ключ закрепления в PinStore.
+ *
+ * <p>После перевода на механизм {@code addDebugInfo} стандартные секции
+ * (Machine/Material/Thermal/Bearings/Transmission) отдаёт сама база
+ * {@link MechanicalMachine}, класс-специфика (Source/Chassis/Flywheel) —
+ * подклассы, BE-уровень — BlockEntity, аддоны — свои компоненты. Инспектор
+ * знает только Group-секцию (она требует данных группы, а не машины).
  */
 public final class InspectorSnapshot {
 
@@ -191,35 +190,73 @@ public final class InspectorSnapshot {
             String blockKey, String blockPos, String machineClass,
             String groupLine, String membersLine, String netSpeedLine, boolean groupUnknown,
             MechanicalMachine machine) {
+        return collect(blockKey, blockPos, machineClass,
+                groupLine, membersLine, netSpeedLine, groupUnknown, machine, null);
+    }
+
+    /**
+     * Полная сборка: Group-секция инспектора + вклады всех компонентов через
+     * {@code addDebugInfo} (машина отдаёт Machine/Material/Thermal/Bearings/
+     * Transmission + класс-специфику, BE — свой уровень, аддоны — свои секции).
+     * Единая точка сбора: вызывающему не нужно самому дёргать addDebugInfo.
+     *
+     * <p>Коллектор переиспользуется (рендер-тред — единственный потребитель,
+     * как SYNC_VIEW в TFNetworking).
+     *
+     * @param blockEntity BlockEntity блока (null — вклад BE недоступен)
+     */
+    public static InspectorSnapshot collect(
+            String blockKey, String blockPos, String machineClass,
+            String groupLine, String membersLine, String netSpeedLine, boolean groupUnknown,
+            MechanicalMachine machine,
+            MechanicalBlockEntity blockEntity) {
         final List<Section> sections = new ArrayList<>();
-
         sections.add(groupSection(groupLine, membersLine, netSpeedLine, groupUnknown));
-        sections.add(machineSection(machine));
-        sections.add(materialSection(machine));
-        sections.add(thermalSection(machine));
 
-        final Section bearings = bearingsSection(machine);
-        if (bearings != null) {
-            sections.add(bearings);
+        final DebugInfoCollector extras = EXTRAS;
+        extras.clear();
+        if (machine != null) {
+            machine.addDebugInfo(extras);
         }
-        final Section source = sourceSection(machine);
-        if (source != null) {
-            sections.add(source);
+        if (blockEntity != null) {
+            blockEntity.addDebugInfo(extras);
         }
-        final Section chassis = chassisSection(machine);
-        if (chassis != null) {
-            sections.add(chassis);
-        }
-        final Section flywheel = flywheelSection(machine);
-        if (flywheel != null) {
-            sections.add(flywheel);
-        }
-        sections.add(transmissionSection(machine));
+        appendExtras(sections, extras);
 
         return new InspectorSnapshot(
                 "TF Inspector — " + machineClass,
                 blockKey + " @ " + blockPos,
                 sections);
+    }
+
+    /** Переиспользуемый коллектор вкладов (рендер-тред — единственный потребитель). */
+    private static final DebugInfoCollector EXTRAS = new DebugInfoCollector();
+
+    /**
+     * Конвертация секций коллектора в метрики инспектора. Стабильный id
+     * записи коллектора ("section.key") становится id метрики — пины HUD
+     * работают и для аддонских секций. Package-private: тесты порядка.
+     */
+    static void appendExtras(List<Section> sections, DebugInfoCollector extras) {
+        if (extras == null) {
+            return;
+        }
+        for (DebugInfoCollector.Section extra : extras.sections()) {
+            final List<Metric> metrics = new ArrayList<>(extra.entries().size());
+            for (DebugInfoCollector.Entry entry : extra.entries()) {
+                metrics.add(toMetric(extra.name(), entry));
+            }
+            sections.add(new Section(extra.name(), metrics));
+        }
+    }
+
+    /**
+     * id метрики = id записи коллектора (без двойного префикса секции) —
+     * приватный конструктор доступен: класс тот же.
+     */
+    private static Metric toMetric(String section, DebugInfoCollector.Entry e) {
+        return new Metric(e.key(), section, e.label(), e.value(),
+                e.alert(), e.barFraction(), e.hint());
     }
 
     private static Section groupSection(
@@ -233,232 +270,6 @@ public final class InspectorSnapshot {
             metrics.add(Metric.of("Group", "netspeed", "Network speed", netSpeedLine));
         }
         return new Section("Group", metrics);
-    }
-
-    private static Section machineSection(MechanicalMachine machine) {
-        final List<Metric> metrics = new ArrayList<>();
-        final boolean jammed = machine.getWorkState() == dev.sdm.torque_foundry.physics.WorkState.JAMMED;
-        final boolean insufficient =
-                machine.getWorkState() == dev.sdm.torque_foundry.physics.WorkState.INSUFFICIENT_POWER;
-        metrics.add(Metric.full("Machine", "state", "State",
-                machine.getWorkState().name(), jammed || insufficient,
-                Float.NaN, "WORKING — работает; IDLE — стоит; INSUFFICIENT — перегруз; JAMMED — клин"));
-        metrics.add(Metric.of("Machine", "required", "Required",
-                formatPower(machine.getRequired())));
-        metrics.add(Metric.of("Machine", "received", "Received",
-                formatPower(machine.getReceived())));
-        metrics.add(Metric.of("Machine", "netpower", "Net power",
-                machine.getReceived().getPower() + " W"));
-        metrics.add(Metric.hint("Machine", "leafpower", "Leaf power",
-                machine.getFreePower() + " W",
-                "Свободная мощность узла: received минус требования детей"));
-        metrics.add(Metric.of("Machine", "inputs", "Inputs",
-                formatDirections(machine.getInputDirections())));
-        metrics.add(Metric.of("Machine", "outputs", "Outputs",
-                formatDirections(machine.getOutputDirections())));
-
-        final SimulationState sim = machine.getSimulationState();
-        metrics.add(Metric.of("Machine", "tickpower", "Tick power",
-                "recv " + sim.getReceivedWatts() + " W, children "
-                        + sim.getChildrenWatts() + " W, free " + sim.getFreeWatts() + " W"));
-        return new Section("Machine", metrics);
-    }
-
-    private static Section materialSection(MechanicalMachine machine) {
-        final PhysicsMaterial m = machine.getMaterial();
-        final List<Metric> metrics = new ArrayList<>();
-        metrics.add(Metric.of("Material", "name", "Material", m.name()));
-        metrics.add(Metric.of("Material", "limits", "Safe RPM / T_max",
-                m.maxSafeSpeedRpm() + " RPM / " + String.format(Locale.ROOT, "%.0f Nm",
-                        m.defaultMaxSafeTorqueNm())));
-        metrics.add(Metric.of("Material", "elastic", "E / G / nu / rho",
-                String.format(Locale.ROOT, "%.0f GPa / %.1f GPa / %.2f / %.0f kg/m3",
-                        m.youngModulusGpa(), m.shearModulusGpa(), m.poissonRatio(),
-                        m.densityKgM3())));
-        metrics.add(Metric.of("Material", "strength", "sig_y / tau_y / sig_u / sig-1",
-                String.format(Locale.ROOT, "%.0f / %.0f / %.0f / %.0f MPa",
-                        m.yieldTensileMpa(), m.yieldShearMpa(), m.tensileStrengthMpa(),
-                        m.fatigueStrengthMpa())));
-        metrics.add(Metric.of("Material", "surface", "mu / HB / c / lambda",
-                String.format(Locale.ROOT, "%.2f / %.0f / %.0f J/kgK / %.1f W/mK",
-                        m.frictionCoefficient(), m.hardnessHb(), m.heatCapacityJPerKgK(),
-                        m.thermalConductivityWPerMK())));
-        metrics.add(Metric.hint("Material", "derived", "Inertia / Friction / Mass",
-                String.format(Locale.ROOT, "%.3f / %.5f / %.2f kg",
-                        m.relativeDensity(), m.viscousFriction(), m.nominalMassKg()),
-                "Игровые производные: вклад в инерцию сети, вязкое трение, масса детали"));
-        return new Section("Material", metrics);
-    }
-
-    private static Section thermalSection(MechanicalMachine machine) {
-        final SimulationState sim = machine.getSimulationState();
-        final PhysicsMaterial m = machine.getMaterial();
-        final double t = sim.temperatureC(m, m.nominalMassKg());
-        final double overheat = sim.overheatingK(m, m.nominalMassKg());
-        final List<Metric> metrics = new ArrayList<>();
-        metrics.add(Metric.barAlert("Thermal", "temp", "Temperature",
-                String.format(Locale.ROOT, "%.1f C (overheat +%.1f K)", t, overheat),
-                overheat > 60.0, clamp01((float) ((t - 20.0) / 80.0))));
-        metrics.add(Metric.of("Thermal", "energy", "Thermal energy",
-                String.format(Locale.ROOT, "%.1f J", sim.getThermalEnergyJ())));
-        metrics.add(Metric.of("Thermal", "throughput", "Throughput",
-                String.format(Locale.ROOT, "%.1f kJ", sim.getTotalThroughputJ() / 1000.0)));
-        metrics.add(Metric.hint("Thermal", "overload", "Overload ticks",
-                String.valueOf(sim.getOverloadTicks()),
-                "Счётчик ресурса: тики в INSUFFICIENT/JAMMED за жизнь детали"));
-        return new Section("Thermal", metrics);
-    }
-
-    private static Section bearingsSection(MechanicalMachine machine) {
-        if (!machine.hasBearingSlots()) {
-            return null;
-        }
-        final List<Metric> metrics = new ArrayList<>();
-        for (int slot = 0; slot < 2; slot++) {
-            final Bearing b = machine.getBearing(slot);
-            final String label = "Slot " + slot;
-            if (!b.present()) {
-                metrics.add(Metric.of("Bearings", "slot" + slot, label, b.type() + " (bare)"));
-            } else if (b.broken()) {
-                metrics.add(Metric.barAlert("Bearings", "slot" + slot, label,
-                        b.type() + String.format(Locale.ROOT, " BROKEN (%.0f%%)", b.wear() * 100),
-                        true, (float) b.wear()));
-            } else {
-                metrics.add(Metric.barAlert("Bearings", "slot" + slot, label,
-                        b.type() + String.format(Locale.ROOT,
-                                " %.0f%% worn, rating %d RPM, friction x%.2f",
-                                b.wear() * 100, b.type().rpmRating(),
-                                b.frictionMultiplier(machine.getLubricant().available())),
-                        b.wear() > 0.7, (float) b.wear()));
-            }
-        }
-
-        final LubricantState lube = machine.getLubricant();
-        final float fill = (float) (lube.amount() / LubricantState.CAPACITY);
-        metrics.add(Metric.barAlert("Bearings", "lubricant", "Lubricant",
-                lube.type() + String.format(Locale.ROOT, " %.0f/%.0f (%.0f%%)%s",
-                        lube.amount(), LubricantState.CAPACITY, fill * 100.0,
-                        lube.available() ? "" : " [DRY]"),
-                !lube.available() && lube.type() != LubricantState.Type.NONE,
-                clamp01(fill)));
-
-        metrics.add(Metric.of("Bearings", "alignment", "Misalignment / Friction / Wear",
-                String.format(Locale.ROOT, "+%.1f deg / x%.2f / x%.2f",
-                        machine.getMisalignmentDeg(),
-                        machine.frictionMultiplier(0),
-                        machine.wearFactor())));
-        return new Section("Bearings", metrics);
-    }
-
-    private static Section sourceSection(MechanicalMachine machine) {
-        if (!(machine instanceof GeneratorMachine generator)) {
-            return null;
-        }
-        final List<Metric> metrics = new ArrayList<>();
-        final RotationalPower out = generator.getOutput();
-        metrics.add(Metric.of("Source", "rated", "Rated output", formatPower(out)));
-        final double factor = generator.getOutputFactor();
-        metrics.add(Metric.full("Source", "derate", "Thermal derate",
-                String.format(Locale.ROOT, "%.0f%%", factor * 100)
-                        + (factor < 1.0 ? " DERATED (overheated)" : ""),
-                factor < 1.0, (float) factor,
-                "Перегрев режет паспортный момент: потери P(1-eta)/eta греют ротор"));
-        return new Section("Source", metrics);
-    }
-
-    private static Section chassisSection(MechanicalMachine machine) {
-        if (!(machine instanceof ChassisMachine chassis)) {
-            return null;
-        }
-        final List<Metric> metrics = new ArrayList<>();
-        if (!chassis.hasCore()) {
-            metrics.add(Metric.alert("Chassis", "core", "Core", "empty (open box, no power)",
-                    true));
-            return new Section("Chassis", metrics);
-        }
-        if (chassis.isShaftMode()) {
-            metrics.add(Metric.of("Chassis", "core", "Core",
-                    "shaft insert: " + chassis.getShaftMaterial().name()));
-        } else {
-            metrics.add(Metric.of("Chassis", "core", "Core",
-                    "gear: " + chassis.getTeeth() + " teeth, " + chassis.getMaterial().name()));
-            metrics.add(Metric.hint("Chassis", "ratio", "Ratio",
-                    "8/" + chassis.getTeeth() + " (drive pinion 8T, external mesh reverses)",
-                    "Больше зубьев — ниже обороты, выше момент"));
-        }
-        return new Section("Chassis", metrics);
-    }
-
-    private static Section flywheelSection(MechanicalMachine machine) {
-        if (!(machine instanceof FlywheelMachine flywheel)) {
-            return null;
-        }
-        final List<Metric> metrics = new ArrayList<>();
-        metrics.add(Metric.barHint("Flywheel", "energy", "Stored energy",
-                String.format(Locale.ROOT, "%.1f / %.0f J (%.0f%%)",
-                        flywheel.getEnergy(), flywheel.getCapacity(), flywheel.getFill() * 100),
-                clamp01((float) flywheel.getFill()),
-                "Заряд от излишка сети, разряд покрывает дефицит момента"));
-        return new Section("Flywheel", metrics);
-    }
-
-    private static Section transmissionSection(MechanicalMachine machine) {
-        final List<Metric> metrics = new ArrayList<>();
-        final double eta = machine.getEfficiency();
-        metrics.add(Metric.bar("Transmission", "efficiency", "Efficiency",
-                eta < 1.0
-                        ? String.format(Locale.ROOT, "%.0f%% (loss heats this machine)", eta * 100)
-                        : "100% (lossless)",
-                (float) eta));
-
-        final long breakaway = machine.getBreakawayTorqueRaw();
-        if (breakaway > 0) {
-            metrics.add(Metric.of("Transmission", "breakaway", "Breakaway torque",
-                    String.format(Locale.ROOT, "%.1f Nm", breakaway / 1000.0)));
-        }
-
-        final long idle = machine.getIdleTorqueRaw();
-        if (idle > 0) {
-            metrics.add(Metric.of("Transmission", "idle", "Idle torque",
-                    String.format(Locale.ROOT, "%.1f Nm", idle / 1000.0)));
-        }
-
-        final double extraI = machine.getExtraInertia();
-        if (extraI > 0) {
-            metrics.add(Metric.of("Transmission", "inertia", "Rotor inertia",
-                    String.format(Locale.ROOT, "+%.2f", extraI)));
-        }
-        if (metrics.size() == 1) {
-            // Только efficiency — секцию всё равно показываем (pin-стабильность).
-            return new Section("Transmission", metrics);
-        }
-        return new Section("Transmission", metrics);
-    }
-
-    // --- Форматтеры ---
-
-    public static String formatPower(RotationalPower power) {
-        return String.format(Locale.ROOT, "%.3f RPM, %.3f Nm, dir=%s",
-                power.getSpeedRpm(), power.getTorqueNm(),
-                dev.sdm.torque_foundry.physics.RotationDirection.from(power.getDirection()));
-    }
-
-    private static String formatDirections(net.minecraft.core.Direction[] directions) {
-        if (directions == null || directions.length == 0) {
-            return "-";
-        }
-        final StringBuilder sb = new StringBuilder();
-        for (net.minecraft.core.Direction direction : directions) {
-            if (!sb.isEmpty()) {
-                sb.append(", ");
-            }
-            sb.append(direction.name());
-        }
-        return sb.toString();
-    }
-
-    private static float clamp01(float v) {
-        return Math.min(1.0f, Math.max(0.0f, v));
     }
 
     /** Пустой снепшот-заглушка (нечего показать). */

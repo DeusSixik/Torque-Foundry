@@ -152,7 +152,8 @@ public final class InspectorWindow {
         cached = InspectorSnapshot.collect(
                 target.blockKey(), target.pos().toShortString(),
                 machine.getClass().getSimpleName(),
-                groupLine, membersLine, netSpeedLine, groupUnknown, machine);
+                groupLine, membersLine, netSpeedLine, groupUnknown, machine,
+                target.mechanical());
         return cached;
     }
 

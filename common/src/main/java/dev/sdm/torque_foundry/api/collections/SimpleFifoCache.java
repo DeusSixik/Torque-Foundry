@@ -1,4 +1,4 @@
-package dev.sdm.torque_foundry.api.uitls;
+package dev.sdm.torque_foundry.api.collections;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 

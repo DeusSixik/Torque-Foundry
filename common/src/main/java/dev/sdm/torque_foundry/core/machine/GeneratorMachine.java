@@ -79,4 +79,18 @@ public class GeneratorMachine extends MechanicalMachine {
     public double getOutputFactor() {
         return outputFactor;
     }
+
+    /** Секция Source: паспортная выдача и тепловой derate ротора. */
+    @Override
+    public void addDebugInfo(dev.sdm.torque_foundry.api.debug.DebugInfoCollector collector) {
+        super.addDebugInfo(collector);
+        final double factor = getOutputFactor();
+        collector.section("Source")
+                .addKey("Source.rated", "Rated output", fmtPower(getOutput()))
+                .entryKey("Source.derate", "Thermal derate",
+                        String.format(java.util.Locale.ROOT, "%.0f%%", factor * 100)
+                                + (factor < 1.0 ? " DERATED (overheated)" : ""),
+                        factor < 1.0, (float) factor,
+                        "Перегрев режет паспортный момент: потери P(1-eta)/eta греют ротор");
+    }
 }

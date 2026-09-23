@@ -3,7 +3,7 @@ package dev.sdm.torque_foundry.core.client.render;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
-import dev.sdm.torque_foundry.api.uitls.FastutilLruCache;
+import dev.sdm.torque_foundry.api.collections.FastutilLruCache;
 import dev.sdm.torque_foundry.api.render.DefaultModModels;
 import dev.sdm.torque_foundry.core.client.render.structs.Quad;
 import dev.sdm.torque_foundry.core.client.render.structs.Vertex;

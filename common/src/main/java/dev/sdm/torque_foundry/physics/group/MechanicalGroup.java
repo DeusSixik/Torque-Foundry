@@ -1,6 +1,7 @@
 package dev.sdm.torque_foundry.physics.group;
 
 
+import dev.sdm.torque_foundry.api.events.physics.PhysicsEventDispatcher;
 import dev.sdm.torque_foundry.api.physics.GroupSnapshotView;
 import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.physics.PhysicsMath;
@@ -76,6 +77,15 @@ public class MechanicalGroup {
     }
 
     /**
+     * Группа в клине (с прошлого тика). Читается только в треде владельца
+     * (воркер физики / GroupTask) — на серверном треде значение может быть
+     * устаревшим на тик (см. I6).
+     */
+    public boolean isJammed() {
+        return jammedState;
+    }
+
+    /**
      * Текущие обороты сети в milli-RPM (для тестов).
      */
     public long currentSpeedForTest() {
@@ -116,6 +126,9 @@ public class MechanicalGroup {
      */
     private int directionConflictTicks = 0;
     private static final int DIRECTION_JAM_TICKS = 20;
+
+    /** Группа в клине (для событий JAMMED/UNJAMMED: переходы, не каждый тик). */
+    private boolean jammedState;
 
     // --- Снапшот (протокол «Concurrency in Torque Foundry.md», §4) ---
 
@@ -540,6 +553,7 @@ public class MechanicalGroup {
             for (int h = 0; h < hooks.size(); h++) {
                 hooks.get(h).onGroupTickStart(thisGroup(), simContext);
             }
+            PhysicsEventDispatcher.fireGroupTickStart(thisGroup(), simTick);
 
             Arrays.fill(parent, 0, n, -1);
             Arrays.fill(hasPower, 0, n, false);
@@ -565,9 +579,28 @@ public class MechanicalGroup {
                 }
             }
 
+            // События переходов клина: только факт смены состояния,
+            // не каждый тик (иначе спам на длинном клине).
+            int jammedCount = 0;
+            for (int i = 0; i < n; i++) {
+                if (states[i] == WorkState.JAMMED) {
+                    jammedCount++;
+                }
+            }
+            final boolean jammedNow = jammedCount > 0;
+            if (jammedNow && !jammedState) {
+                PhysicsEventDispatcher.fireGroupJammed(thisGroup(), simTick, jammedCount);
+            } else if (!jammedNow && jammedState) {
+                PhysicsEventDispatcher.fireGroupUnjammed(thisGroup(), simTick);
+            }
+            jammedState = jammedNow;
+
             for (int h = 0; h < hooks.size(); h++) {
                 hooks.get(h).onGroupTickEnd(thisGroup(), simContext);
             }
+            // END — последним: состояние группы полностью финально
+            // (фазы + запись состояний + переходы клина + хуки).
+            PhysicsEventDispatcher.fireGroupTickEnd(thisGroup(), simTick);
         }
 
         private MechanicalGroup thisGroup() {
