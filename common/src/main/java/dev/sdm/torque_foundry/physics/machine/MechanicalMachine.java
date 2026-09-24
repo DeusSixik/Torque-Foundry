@@ -508,6 +508,26 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
+     * Отношение скоростей узла на грани {@code outputSide} как несократимая
+     * дробь {числитель, знаменатель} (s_out / s_in), или {@code null} —
+     * узел отношение не меняет (вал, тройник, passthrough-грань).
+     *
+     * <p>Дробь нужна проверке замкнутых контуров (раздел 11.2): зубья
+     * целые и точные, а скорости джиттерят от остатков целочисленного
+     * деления — по скоростям контур из взаимно простых зубцов был бы
+     * признан несошедшимся, хотя он сходится ровно.
+     *
+     * <p>Реализации возвращают кэшированный в конструкторе массив —
+     * новых объектов на тик не создаётся.
+     *
+     * @param outputSide грань выхода
+     * @return кэшированная дробь {s_out, s_in} или null (1:1)
+     */
+    public long[] getOutputRatioFraction(Direction outputSide) {
+        return null;
+    }
+
+    /**
      * Момент страгивания (milli-Nm): входного момента меньше — машина
      * не тронется и клинит сеть. 0 — страгивание не требуется.
      */
@@ -547,6 +567,19 @@ public class MechanicalMachine implements DebugInfoProvider {
      */
     public double getOutputFactor() {
         return 1.0;
+    }
+
+    /**
+     * Потребляет ли источник энергию в УПОР (раздел 11.3). Заклинившая сеть
+     * стоит, но источник продолжает тянуть: мотор жрёт ток короткого
+     * замыкания, пар — дросселирует через стоячие лопатки. Коэффициент k
+     * из паспорта источника: единица у мотора и турбины (по умолчанию),
+     * ноль — явное свойство паспорта тех, кто физически отсоединяется от
+     * своего потока, когда вал встал (водяное колесо: вода переливается
+     * через неподвижные ковши). Промежуточные значения не нужны.
+     */
+    public boolean heatsUpWhenStalled() {
+        return true;
     }
 
     /**
@@ -603,21 +636,6 @@ public class MechanicalMachine implements DebugInfoProvider {
 
     protected void setPassive(boolean passive) {
         this.passive = passive;
-    }
-
-    /**
-     * Машина-буфер (маховик): покрывает пиковый дефицит момента из своего
-     * запаса — перегрузка не передаётся вверх по сети, пока есть резерв.
-     */
-    public boolean coversDeficitFromBuffer() {
-        return false;
-    }
-
-    /**
-     * Есть ли сейчас резерв буфера (для машин с coversDeficitFromBuffer).
-     */
-    public boolean hasBufferReserve() {
-        return false;
     }
 
     public Direction.Axis getAxis() {

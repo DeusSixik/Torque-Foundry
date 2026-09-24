@@ -97,6 +97,30 @@ public class MechanicalGroup {
         return currentSpeedRaw;
     }
 
+    /**
+     * Приведённая к базовому уровню инерция сети с последнего физического
+     * тика (фаза B). Нужна слиянию сетей: формула неупругого удара верна
+     * ровно настолько, насколько верны инерции обеих сетей (раздел 11.1
+     * документа физики). Значение устаревает на тик — для событий топологии
+     * это верх границы погрешности; инерция только что добавленного узла
+     * стыка учитывается слиянием отдельно.
+     */
+    protected double lastReducedInertia;
+
+    /**
+     * Приведённая инерция сети (для тестов слияния).
+     */
+    public double reducedInertiaForTest() {
+        return lastReducedInertia;
+    }
+
+    /**
+     * Перенапряжение узла с последнего тика (для тестов контуров).
+     */
+    public boolean overstrainForTest(int index) {
+        return index >= 0 && index < overstrainBuf.length && overstrainBuf[index];
+    }
+
     // --- Scratch-буферы тика (mutable-архитектура: ноль аллокаций в тике) ---
     // Переиспользуются между тиками, растут при росте группы.
     private int[] parentBuf = new int[0];
@@ -116,6 +140,10 @@ public class MechanicalGroup {
     private int[] edgeToBuf = new int[0];
     private long[] edgeSpeedBuf = new long[0];
     private long[] edgeTorqueBuf = new long[0];
+    private boolean[] edgeConnectionBuf = new boolean[0];
+    private boolean[] overstrainBuf = new boolean[0];
+    private long[] ratioNumBuf = new long[0];
+    private long[] ratioDenBuf = new long[0];
     private boolean[] jammedBuf = new boolean[0];
     private boolean[] conflictBuf = new boolean[0];
     private final Long2IntMap posToIndexBuf = new Long2IntOpenHashMap();
@@ -170,6 +198,16 @@ public class MechanicalGroup {
 
     private static double[] ensureDouble(double[] buffer, int size) {
         return buffer.length >= size ? buffer : new double[size];
+    }
+
+    /** НОД: сокращение дробей отношений контуров (раздел 11.2). */
+    private static long gcd(long a, long b) {
+        while (b != 0) {
+            final long t = a % b;
+            a = b;
+            b = t;
+        }
+        return a;
     }
 
     private static RotationalPower[] ensurePower(RotationalPower[] buffer, int size) {
@@ -394,6 +432,80 @@ public class MechanicalGroup {
         otherGroup.size = 0;
     }
 
+    /**
+     * Слияние сетей как НЕУПРУГИЙ УДАР (С1 п.4, раздел 11.1): жёсткое
+     * соединение сохраняет момент импульса, но не энергию — разница уходит
+     * теплом в узел стыка. Ставить блок между двумя крутящимися линиями
+     * больше не создаёт и не уничтожает энергию фактом установки.
+     *
+     * <p>Реализует расчет по формулам:
+     * <pre>
+     *   ω   = (J₁·ω₁ + J₂·ω₂·d) / (J₁ + J₂)
+     *   ΔQ  = E(J₁,ω₁) + E(J₂,ω₂) − E(J₁+J₂, ω)
+     *   E(J,ω) = (J·ω²)/2, ω в рад/с
+     * </pre>
+     *
+     * <p>Где:
+     * <ul>
+     *   <li><b>J₁, J₂</b> — приведённые инерции сетей с последних тиков
+     *       (плюс паспортная инерция самого узла стыка);</li>
+     *   <li><b>ω₁, ω₂</b> — обороты сетей, milli-RPM;</li>
+     *   <li><b>d</b> — знак направления: +1 со-вращение, −1 встречное
+     *       вращение (по направлениям машин-соседей у стыка);</li>
+     *   <li><b>ΔQ</b> — разница кинетической энергии, Дж: греет узел стыка
+     *       (его зубья/штифт/накладки). Встречное вращение с равными
+     *       импульсами сжигает в стыке ВСЮ кинетическую энергию.</li>
+     * </ul>
+     *
+     * <p>Сопоставление с аргументами: {@code J₁/ω₁} — состояние этой группы,
+     * {@code J₂/ω₂} — {@code otherGroup}; {@code joint} — узел стыка;
+     * {@code hostNeighbor}/{@code guestNeighbor} — машины-соседи стыка по
+     * обе стороны (для знака d).
+     *
+     * <p>Тредовый контракт: вызов из серверного треда (событие топологии).
+     * Запас тепла в узел стыка — одно двойное сложение поверх физического
+     * тика; потеря параллельного инкремента тепла за тик — приемлемая цена.
+     *
+     * @param otherGroup    вливаемая группа; после слияния пуста
+     * @param joint         машина-узел стыка (новый блок), уже в этой группе
+     * @param hostNeighbor  сосед стыка со стороны этой группы, может быть null
+     * @param guestNeighbor сосед стыка со стороны вливаемой группы, может быть null
+     */
+    public void merge(@NotNull MechanicalGroup otherGroup, @NotNull MechanicalMachine joint,
+                      @Nullable MechanicalMachine hostNeighbor, @Nullable MechanicalMachine guestNeighbor) {
+        if (otherGroup == this || otherGroup.size == 0) {
+            return;
+        }
+
+        final double j1 = Math.max(1.0, lastReducedInertia) + Math.max(0.0, joint.getInertia());
+        final double j2 = Math.max(1.0, otherGroup.lastReducedInertia);
+        final double w1 = this.currentSpeedRaw;
+        final double w2 = otherGroup.currentSpeedRaw;
+
+        // Знак по направлениям машин-соседей: одинаковый байт — со-вращение,
+        // разный — встречное вращение (отрицательный член суммы импульса)
+        final byte dHost = hostNeighbor != null ? hostNeighbor.getReceived().getDirection() : 0;
+        final byte dGuest = guestNeighbor != null ? guestNeighbor.getReceived().getDirection() : 0;
+        final double sign = dHost == dGuest ? 1.0 : -1.0;
+
+        final double momentum = j1 * w1 + sign * j2 * w2;
+        final double jTotal = j1 + j2;
+        final double newSpeed = Math.abs(momentum) / jTotal;
+
+        // Разница кинетической энергии — в тепло узла стыка (Дж)
+        final double deltaQ = PhysicsMath.kineticEnergyNetworkJ(j1, w1)
+                + PhysicsMath.kineticEnergyNetworkJ(j2, w2)
+                - PhysicsMath.kineticEnergyNetworkJ(jTotal, newSpeed);
+        if (deltaQ > 0) {
+            joint.getSimulationState().addHeatJ(deltaQ);
+        }
+
+        // Перенос машин (прежняя механика) уже с новой скоростью сети
+        merge(otherGroup);
+        this.currentSpeedRaw = Math.round(newSpeed);
+        lastReducedInertia = jTotal;
+    }
+
     @Nullable
     public MechanicalGroup split(int splitIndex) {
         if (splitIndex < 0 || splitIndex >= size) {
@@ -562,11 +674,17 @@ public class MechanicalGroup {
         final int[] edgeTo;
         final long[] edgeSpeed;
         final long[] edgeTorque;
+        final boolean[] edgeConnection;
+        final boolean[] overstrain;
+        final long[] ratioNum;
+        final long[] ratioDen;
         final boolean[] conflict;
         final boolean[] jammed;
         int edgeCount;
         boolean directionJam;
         boolean boggingDown;
+        /** Целевые обороты сети (паспорт источника) — для тепла перенапряжения. */
+        long targetSpeedRaw;
 
         TickDriver() {
             parent = parentBuf = ensureInt(parentBuf, n);
@@ -575,6 +693,9 @@ public class MechanicalGroup {
             capTorque = capTorqueBuf = ensureLong(capTorqueBuf, n);
             subtreeInertia = subtreeInertiaBuf = ensureDouble(subtreeInertiaBuf, n);
             uNode = uNodeBuf = ensureDouble(uNodeBuf, n);
+            ratioNum = ratioNumBuf = ensureLong(ratioNumBuf, n);
+            ratioDen = ratioDenBuf = ensureLong(ratioDenBuf, n);
+            overstrain = overstrainBuf = ensureBoolean(overstrainBuf, n);
             states = stateBuf = ensureObjects(stateBuf, n, WorkState[]::new);
             inputPower = inputPowerBuf = ensurePower(inputPowerBuf, n);
             hasPower = hasPowerBuf = ensureBoolean(hasPowerBuf, n);
@@ -585,6 +706,7 @@ public class MechanicalGroup {
             edgeTo = edgeToBuf = ensureInt(edgeToBuf, maxEdges);
             edgeSpeed = edgeSpeedBuf = ensureLong(edgeSpeedBuf, maxEdges);
             edgeTorque = edgeTorqueBuf = ensureLong(edgeTorqueBuf, maxEdges);
+            edgeConnection = edgeConnectionBuf = ensureBoolean(edgeConnectionBuf, maxEdges);
             conflict = conflictBuf = ensureBoolean(conflictBuf, n);
             jammed = jammedBuf = ensureBoolean(jammedBuf, n);
         }
@@ -601,6 +723,7 @@ public class MechanicalGroup {
             Arrays.fill(depth, 0, n, 0);
             Arrays.fill(conflict, 0, n, false);
             Arrays.fill(jammed, 0, n, false);
+            Arrays.fill(overstrain, 0, n, false);
             edgeCount = 0;
             queueHead = 0;
             queueTail = 0;
@@ -688,13 +811,30 @@ public class MechanicalGroup {
                 if (!hasPower[i]) {
                     hasPower[i] = true;
                 }
-                // Источник стоит на базовом уровне сети
+                // Источник стоит на базовом уровне сети; дробь пути источника — 1/1
                 uNode[i] = 1.0;
+                ratioNum[i] = 1;
+                ratioDen[i] = 1;
                 inputPower[i].copyFrom(output);
                 // Тепловой derate: перегретый источник режет паспортный момент
                 inputPower[i].setTorqueRaw(
                         Math.round(output.getTorqueRaw() * machines[i].getOutputFactor()));
                 inputPower[i].setSpeedRaw(currentSpeedRaw);
+
+                // Клин и источники (раздел 11.3): сеть стоит клином, но
+                // источник продолжает тянуть упор — момент давит в зубья
+                // на паспортных оборотах и УХОДИТ В ТЕПЛО узла:
+                //   Q += k · T_упора · ω_паспорта · Δt
+                // k — из паспорта (heatsUpWhenStalled): мотор греется,
+                // водяное колесо — нет. Без этого перегрев генератора от
+                // клина не посчитать: мощность τ·ω на нулевой скорости ноль.
+                if (currentSpeedRaw == 0 && jammedState && machines[i].heatsUpWhenStalled()) {
+                    final double tauNm = inputPower[i].getTorqueRaw() / 1000.0;
+                    final double omegaPassport =
+                            output.getSpeedRaw() * 2.0 * Math.PI / 60000.0;
+                    machines[i].getSimulationState().addHeatJ(tauNm * omegaPassport / 20.0);
+                }
+
                 queue[queueTail++] = i;
             }
 
@@ -723,16 +863,38 @@ public class MechanicalGroup {
                         continue;
                     }
                     final int j = posToIndexBuf.get(neighborPos.asLong());
-                    // Уровневая фильтрация DAG: энергия течёт только НА СЛЕДУЮЩИЙ
-                    // уровень. Обратное ребро (вал передаёт назад уже питаемому узлу)
-                    // удваивало бы мощность — отсекаем.
-                    if (hasPower[j] && depth[j] != depth[i] + 1) {
-                        continue;
-                    }
                     // Энергия идёт только по СТРОГОМУ направлению: выход -> встречный вход.
                     if (!MechanicalGroupManager.canTransferPower(from, machines[j], dir)) {
                         continue;
                     }
+
+                    // --- Отношение ребра как точная дробь (раздел 11.2) ---
+                    // Зубья целые и точные; скорости джиттерят от остатков
+                    // деления — контур из взаимно простых зубцов по скоростям
+                    // был бы признан несошедшимся, хотя сходится ровно.
+                    final long[] uf = from.getOutputRatioFraction(dir);
+                    final long un = uf != null ? uf[0] : 1;
+                    final long ud = uf != null ? uf[1] : 1;
+
+                    // Произведение отношений пути к j через это ребро:
+                    // R_new = R_i · u, сокращение КРЕСТ-НАКРЕСТ перед
+                    // умножением (числитель новой со знаменателем текущей и
+                    // наоборот) — множители минимальны, переполнение остаётся
+                    // только у контура, который и не сходится ни в какое
+                    // разумное отношение; такой считается несогласованным.
+                    final long g1 = gcd(ratioNum[i], ud);
+                    final long g2 = gcd(un, ratioDen[i]);
+                    final long n1 = ratioNum[i] / g1;
+                    final long d2 = ud / g1;
+                    final long n2 = un / g2;
+                    final long d1 = ratioDen[i] / g2;
+                    final boolean ratioOverflow =
+                            n1 > Long.MAX_VALUE / n2 || d1 > Long.MAX_VALUE / d2;
+                    final long rawNum = ratioOverflow ? 0 : n1 * n2;
+                    final long rawDen = ratioOverflow ? 0 : d1 * d2;
+                    final long g3 = ratioOverflow ? 1 : gcd(rawNum, rawDen);
+                    final long newNum = rawNum / g3;
+                    final long newDen = rawDen / g3;
 
                     // Мощность на этом ребре: изолированный скратч (хуки мутируют).
                     // Transform узла направленный: в сторону этого ребра
@@ -753,6 +915,11 @@ public class MechanicalGroup {
                     }
 
                     if (!hasPower[j]) {
+                        if (ratioOverflow) {
+                            // Дробь пути не влезает — контур не сходится
+                            overstrain[j] = true;
+                            continue;
+                        }
                         // Первое обнаружение j: сброс stale-значений пула прошлого
                         // тика, иначе слияние ниже сложится с мусором.
                         hasPower[j] = true;
@@ -764,8 +931,40 @@ public class MechanicalGroup {
                         // Скорость узла относительно базового уровня: произведение
                         // отношений по дереву обхода от источника
                         uNode[j] = uNode[i] * childRatio(in.getSpeedRaw(), inputPower[i].getSpeedRaw());
+                        // Дробь отношения пути до j
+                        ratioNum[j] = newNum;
+                        ratioDen[j] = newDen;
                         queue[queueTail++] = j;
+                    } else if (ratioOverflow || newNum != ratioNum[j] || newDen != ratioDen[j]) {
+                        // Второй путь с ДРУГИМ произведением отношений: узел
+                        // обязан крутиться с двумя скоростями сразу — это
+                        // ПЕРЕНАПРЯЖЕНИЕ (11.2). Разность моментов греет узел
+                        // и ломает зуб (фаза C), клин расходится по сети.
+                        overstrain[j] = true;
+                        continue;
+                    } else if (depth[j] != depth[i] + 1) {
+                        // Второй путь с тем же отношением, замыкающий КОЛЬЦО.
+                        // Знак проверяется тем же проходом отдельно от величины:
+                        // согласованный по величине и конфликтный по знаку —
+                        // всё равно нагрузка на зуб (перенапряжение).
+                        if (inputPower[j].getDirection() != in.getDirection()) {
+                            overstrain[j] = true;
+                            continue;
+                        }
+                        // Физически законен — одна скорость, записанная
+                        // несколькими путями. Мощность по кольцу не течёт:
+                        // ребро остаётся СВЯЗЬЮ (по нему расходится клин и
+                        // виден разрыв) и выбрасывается из суммирования.
+                        edgeFrom[edgeCount] = i;
+                        edgeTo[edgeCount] = j;
+                        edgeSpeed[edgeCount] = in.getSpeedRaw();
+                        edgeTorque[edgeCount] = in.getTorqueRaw();
+                        edgeConnection[edgeCount] = true;
+                        edgeCount++;
+                        continue;
                     }
+                    // Второй путь на следующий уровень (depth[j] == depth[i]+1,
+                    // согласованный) — обычное слияние ветвей: сумма ниже.
 
                     // Слияние входов (узел может питаться от нескольких родителей):
                     // обороты — max, момент — ЗНАКОВАЯ сумма: встречные источники
@@ -793,6 +992,7 @@ public class MechanicalGroup {
                     edgeFrom[edgeCount] = i;
                     edgeTo[edgeCount] = j;
                     edgeSpeed[edgeCount] = in.getSpeedRaw();
+                    edgeConnection[edgeCount] = false;
                     // Потолок ребра: потенциал после transform и хуков, БЕЗ КПД
                     // и БЕЗ дележа. Фаза B3 выдаёт детям не больше этого потолка:
                     // через него же проявляется износ вала (ShaftWearHook).
@@ -850,7 +1050,7 @@ public class MechanicalGroup {
                 subtreeInertia[m] = j;
             }
 
-            long targetSpeedRaw = 0;
+            targetSpeedRaw = 0;
             long sourceTorqueRaw = 0;
             boolean hasSource = false;
             // Опорное направление сети = направление первого источника:
@@ -870,6 +1070,11 @@ public class MechanicalGroup {
                 if (hasPower[i]
                         && machine.getSimulationState().isBrokenByHeat()
                         && machine.getHeatFailureMode() == MechanicalMachine.HeatFailureMode.JAM) {
+                    brokenJam = true;
+                }
+                if (hasPower[i] && overstrain[i]) {
+                    // Перенапряжённый контур: разность моментов заклинивает
+                    // узел — сеть не проворачивается
                     brokenJam = true;
                 }
 
@@ -988,6 +1193,9 @@ public class MechanicalGroup {
                     currentSpeedRaw = maxCoast;
                 }
             }
+
+            // Приведённая инерция — для слияния сетей (неупругий удар)
+            lastReducedInertia = totalInertia;
         }
 
         /**
@@ -1028,7 +1236,8 @@ public class MechanicalGroup {
                 final double eta = machines[m].getEfficiency();
                 long childrenCost = 0;
                 for (int e = 0; e < edgeCount; e++) {
-                    if (edgeFrom[e] == m && hasPower[edgeTo[e]]) {
+                    // Рёбра-связи (согласованные кольца) мощность не проводят
+                    if (edgeFrom[e] == m && hasPower[edgeTo[e]] && !edgeConnection[e]) {
                         childrenCost += PhysicsMath.childDemandToInputCost(
                                 subtreeTorque[edgeTo[e]], edgeSpeed[e], in.getSpeedRaw(), eta);
                     }
@@ -1086,7 +1295,7 @@ public class MechanicalGroup {
                 long demandCost = 0;
                 int children = 0;
                 for (int e = 0; e < edgeCount; e++) {
-                    if (edgeFrom[e] == m && hasPower[edgeTo[e]]) {
+                    if (edgeFrom[e] == m && hasPower[edgeTo[e]] && !edgeConnection[e]) {
                         demandCost += PhysicsMath.childDemandToInputCost(
                                 subtreeTorque[edgeTo[e]], edgeSpeed[e], in.getSpeedRaw(), eta);
                         children++;
@@ -1100,7 +1309,7 @@ public class MechanicalGroup {
                     // ноль, а не копия входа, которую рисовала фаза A.
                     for (int e = 0; e < edgeCount; e++) {
                         if (edgeFrom[e] == m && hasPower[edgeTo[e]]
-                                && parentCount[edgeTo[e]] == 1) {
+                                && !edgeConnection[e] && parentCount[edgeTo[e]] == 1) {
                             inputPower[edgeTo[e]].setTorqueRaw(0);
                         }
                     }
@@ -1114,7 +1323,7 @@ public class MechanicalGroup {
 
                 long grantedWatts = 0;
                 for (int e = 0; e < edgeCount; e++) {
-                    if (edgeFrom[e] != m || !hasPower[edgeTo[e]]) {
+                    if (edgeFrom[e] != m || !hasPower[edgeTo[e]] || edgeConnection[e]) {
                         continue;
                     }
                     final int c = edgeTo[e];
@@ -1157,11 +1366,14 @@ public class MechanicalGroup {
                     // Недостижима от источников: машина не powered.
                     // Если раньше крутилась (received > 0) — выбегает по инерции,
                     // замедляясь трением своего материала. Если никогда не
-                    // получала мощность — стоит на месте.
+                    // получала мощность — стоит на месте. Инерция — ПОЛНАЯ
+                    // (материал + ротор): маховик тормозит сам себя так же,
+                    // как сеть тормозит его в фазе B.
                     final long lastSpeed = machine.getReceived().getSpeedRaw();
                     if (lastSpeed > 0) {
                         final long friction = machine.getFrictionTorque(lastSpeed);
-                        final long inertia = Math.max(1L, (long) machine.getInertia());
+                        final long inertia = Math.max(1L, (long) (
+                                machine.getInertia() + machine.getExtraInertia()));
                         final long decel = PhysicsMath.accelStep(friction, inertia);
                         final long coasted = Math.max(0, lastSpeed - decel);
                         machine.getReceived().setSpeedRaw(coasted);
@@ -1182,7 +1394,7 @@ public class MechanicalGroup {
                 // по скорости каждого ребра — у раздатки они разные)
                 long childrenWatts = 0;
                 for (int e = 0; e < edgeCount; e++) {
-                    if (edgeFrom[e] == m && hasPower[edgeTo[e]]) {
+                    if (edgeFrom[e] == m && hasPower[edgeTo[e]] && !edgeConnection[e]) {
                         childrenWatts += PhysicsMath.watts(subtreeTorque[edgeTo[e]], edgeSpeed[e]);
                     }
                 }
@@ -1196,10 +1408,11 @@ public class MechanicalGroup {
                 machine.onNetworkTick(in.getPower(), childrenWatts);
 
                 // Ветвь выше мертва (все родители без питания) => здесь тоже нет питания
+                // (рёбра-связи не считаются родителями: они мощность не проводят)
                 boolean hasParent = false;
                 boolean allParentsDead = true;
                 for (int e = 0; e < edgeCount; e++) {
-                    if (edgeTo[e] == m) {
+                    if (edgeTo[e] == m && !edgeConnection[e]) {
                         hasParent = true;
                         final WorkState ps = states[edgeFrom[e]];
                         // Мёртв только родитель без питания (IDLE). Перегруженный
@@ -1213,6 +1426,20 @@ public class MechanicalGroup {
                 }
                 if (hasParent && allParentsDead) {
                     states[m] = WorkState.IDLE;
+                    continue;
+                }
+
+                // Перенапряжение (раздел 11.2): контур требует разных скоростей
+                // от одной детали — разность моментов греет узел и ломает зуб.
+                // Тепло — по моменту упора на требуемой контуром скорости
+                // (балансная заглушка до появления прочности зуба, п.17);
+                // мощность τ·ω на стоячей сети — ноль, поэтому считаем момент.
+                if (overstrain[m]) {
+                    final double omega =
+                            targetSpeedRaw * uNode[m] * 2.0 * Math.PI / 60000.0;
+                    machine.getSimulationState().addHeatJ(
+                            capTorque[m] / 1000.0 * omega / 20.0);
+                    states[m] = WorkState.JAMMED;
                     continue;
                 }
 
@@ -1285,14 +1512,11 @@ public class MechanicalGroup {
 
                 // Своя потребность + требования детей уже сведены к входной стороне
                 // в фазе B2 (с вычетом подпитки от других родителей при слиянии).
-                // Машина-буфер (маховик) покрывает дефицит из запаса — работает,
-                // пока резерв есть.
                 // Пассивные сегменты (валы) жёстко сцеплены с сетью и вращаются
                 // вместе с ней: перегрузка потребителя не "останавливает" сегмент
                 // передачи — фейлится только машина с собственной потребностью.
-                if (subtreeTorque[m] <= in.getTorqueRaw()
-                        || (machine.coversDeficitFromBuffer() && machine.hasBufferReserve())
-                        || machine.isPassive()) {
+                // Маховик — обычная инерция сети, буферного обхода дефицита нет.
+                if (subtreeTorque[m] <= in.getTorqueRaw() || machine.isPassive()) {
                     states[m] = WorkState.WORKING;
                 } else {
                     states[m] = WorkState.INSUFFICIENT_POWER;
@@ -1313,11 +1537,12 @@ public class MechanicalGroup {
             jammedProducers.clear();
 
             for (int i = 0; i < n; i++) {
-                // Сломанная от перегрева ступень — клин сама по себе,
-                // независимо от того, что насчитали фазы B/C
+                // Сломанная от перегрева ступень и перенапряжённый контур —
+                // клин сами по себе, независимо от того, что насчитали фазы B/C
                 final boolean overheatJam = machines[i].getSimulationState().isBrokenByHeat()
                         && machines[i].getHeatFailureMode() == MechanicalMachine.HeatFailureMode.JAM;
-                if (hasPower[i] && (states[i] == WorkState.INSUFFICIENT_POWER || overheatJam)) {
+                if (hasPower[i] && (states[i] == WorkState.INSUFFICIENT_POWER
+                        || overstrain[i] || overheatJam)) {
                     jammed[i] = true;
                     states[i] = WorkState.JAMMED;
                     jammedMachines.add(machines[i]);

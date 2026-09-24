@@ -29,6 +29,8 @@ public class PlanetaryGearMachine extends MechanicalMachine {
     private final double factor;        // множитель оборотов (может быть < 1)
     private final boolean reverses;
     private final Direction outputSide;
+    /** Скоростное отношение выхода как точная дробь (кэш для контуров). */
+    private final long[] ratioFraction;
 
     public PlanetaryGearMachine(PlanetaryMode mode, int teethSun, int teethRing,
                                 Direction inputSide, Direction outputSide) {
@@ -36,27 +38,54 @@ public class PlanetaryGearMachine extends MechanicalMachine {
         this.mode = mode;
         this.outputSide = outputSide;
 
+        long ratioNum = 1;
+        long ratioDen = 1;
         switch (mode) {
             case CARRIER_OUT -> {
                 this.factor = (double) teethSun / (teethSun + teethRing);
                 this.reverses = false;
+                ratioNum = teethSun;
+                ratioDen = teethSun + teethRing;
             }
             case RING_OUT -> {
                 this.factor = (double) teethSun / teethRing;
                 this.reverses = true;
+                ratioNum = teethSun;
+                ratioDen = teethRing;
             }
             case SUN_OUT -> {
                 this.factor = (double) teethRing / teethSun;
                 this.reverses = false;
+                ratioNum = teethRing;
+                ratioDen = teethSun;
             }
             default -> {
                 this.factor = 1.0;
                 this.reverses = false;
             }
         }
+        // Сокращение дроби зубьев (например, Zs/(Zs+Zr) = 20/60 -> 1/3)
+        final long g = gcd(ratioNum, ratioDen);
+        this.ratioFraction = new long[]{ratioNum / g, ratioDen / g};
 
         port(inputSide, PortRole.INPUT);
         port(outputSide, PortRole.OUTPUT);
+    }
+
+    /** НОД для сокращения дроби зубьев. */
+    private static long gcd(long a, long b) {
+        while (b != 0) {
+            final long t = a % b;
+            a = b;
+            b = t;
+        }
+        return Math.max(1, a);
+    }
+
+    /** Точная дробь отношения (для проверки замкнутых контуров, раздел 11.2). */
+    @Override
+    public long[] getOutputRatioFraction(Direction outputSide) {
+        return outputSide == this.outputSide ? ratioFraction : null;
     }
 
     @Override

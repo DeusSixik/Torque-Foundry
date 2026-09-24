@@ -100,7 +100,9 @@ public final class MechanicalGroupManager {
         }
 
         long targetGroupId = -1;
+        MechanicalMachine targetNeighbor = null;
         final LongList mergeGroupIds = new LongArrayList();
+        final List<MechanicalMachine> mergeNeighbors = new ArrayList<>();
 
         for (Direction side : Direction.values()) {
             final BlockPos neighborPos = rootPos.offset(side.getStepX(), side.getStepY(), side.getStepZ());
@@ -116,9 +118,11 @@ public final class MechanicalGroupManager {
                     if (neighborGroupId != -1 && neighborGroupId != targetGroupId) {
                         if (targetGroupId == -1) {
                             targetGroupId = neighborGroupId;
+                            targetNeighbor = neighborMachine;
                         } else {
                             // Блок соединяет две разные группы — их нужно слить
                             mergeGroupIds.add(neighborGroupId);
+                            mergeNeighbors.add(neighborMachine);
                         }
                     }
                 }
@@ -138,11 +142,13 @@ public final class MechanicalGroupManager {
             group.addElement(machine);
 
             // Все группы, к которым блок также стыкуется, вливаются в целевую:
-            // через новый блок они физически соединены в одну сеть.
+            // через новый блок они физически соединены в одну сеть. Слияние —
+            // неупругий удар: скорость по импульсу, разница энергии греет
+            // узел стыка (новый блок).
             for (int i = 0; i < mergeGroupIds.size(); i++) {
                 final MechanicalGroup other = GROUPS_BY_ID.get(mergeGroupIds.getLong(i));
                 if (other != null && other != group) {
-                    group.merge(other);
+                    group.merge(other, machine, targetNeighbor, mergeNeighbors.get(i));
                     remove(other);
                 }
             }

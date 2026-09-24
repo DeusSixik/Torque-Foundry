@@ -37,10 +37,18 @@ public class CrossBevelSplitterMachine extends MechanicalMachine {
     }
 
     private final BevelOutput[] outputs;
+    /** Скоростные отношения выходов {ti, to}, параллельно outputs (кэш). */
+    private final long[][] ratioFractions;
 
     public CrossBevelSplitterMachine(Direction inputSide, BevelOutput... outputs) {
         super(RotationalPower.fromRaw(0, 0), (byte) -1);
         this.outputs = outputs != null ? outputs.clone() : new BevelOutput[0];
+        this.ratioFractions = new long[this.outputs.length][];
+        for (int i = 0; i < this.outputs.length; i++) {
+            final BevelOutput output = this.outputs[i];
+            ratioFractions[i] = new long[]{Math.max(1, output.teethIn()),
+                    Math.max(1, output.teethOut())};
+        }
 
         port(inputSide, PortRole.INPUT);
         for (BevelOutput output : this.outputs) {
@@ -51,6 +59,17 @@ public class CrossBevelSplitterMachine extends MechanicalMachine {
     @Override
     protected void createDirections() {
         // Порты задаёт конструктор
+    }
+
+    /** Точная дробь отношения ветви (для проверки замкнутых контуров, 11.2). */
+    @Override
+    public long[] getOutputRatioFraction(Direction outputSide) {
+        for (int i = 0; i < outputs.length; i++) {
+            if (outputs[i].side() == outputSide) {
+                return ratioFractions[i];
+            }
+        }
+        return null;
     }
 
     public int getOutputCount() {

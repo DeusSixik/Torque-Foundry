@@ -140,6 +140,33 @@ public final class PhysicsMath {
     // --- Трение ---
 
     /**
+     * Кинетическая энергия вращения в сетевых единицах: E = ½·J·ω², Дж.
+     *
+     * <p>Реализует расчет по формуле:
+     * <pre>
+     *   E = (J · ω²) / 2,   ω = s · 2π / 60000
+     * </pre>
+     *
+     * <p>Где:
+     * <ul>
+     *   <li><b>J</b> — приведённая инерция (единицы инерции сети);</li>
+     *   <li><b>s</b> — обороты, milli-RPM;</li>
+     *   <li><b>ω</b> — угловая скорость, рад/с (milli-RPM × 2π / 60000).</li>
+     * </ul>
+     *
+     * <p>Сопоставление с аргументами: {@code J} &larr; {@code inertia},
+     * {@code s} &larr; {@code speedMilliRpm}.
+     *
+     * @param inertia       приведённая инерция, единицы инерции сети, &ge; 0
+     * @param speedMilliRpm обороты, milli-RPM
+     * @return кинетическая энергия, Дж
+     */
+    public static double kineticEnergyNetworkJ(double inertia, double speedMilliRpm) {
+        final double omega = speedMilliRpm * 2.0 * Math.PI / 60000.0;
+        return 0.5 * inertia * omega * omega;
+    }
+
+    /**
      * Вязкий момент трения: τ = f · ω, минимум 1 milli-Nm —
      * чтобы сеть всегда останавливалась трением.
      *

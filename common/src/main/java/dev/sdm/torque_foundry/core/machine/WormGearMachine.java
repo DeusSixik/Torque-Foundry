@@ -13,11 +13,14 @@ public class WormGearMachine extends MechanicalMachine {
 
     private final int ratio;
     private final Direction outputSide;
+    /** Скоростное отношение выхода {1, ratio} — сильное понижение. */
+    private final long[] ratioFraction;
 
     public WormGearMachine(int ratio, Direction inputSide, Direction outputSide) {
         super(RotationalPower.fromRaw(0, 0), (byte) -1);
         this.ratio = Math.max(1, ratio);
         this.outputSide = outputSide;
+        this.ratioFraction = new long[]{1, this.ratio};
         port(inputSide, PortRole.INPUT);
         port(outputSide, PortRole.OUTPUT);
     }
@@ -38,6 +41,12 @@ public class WormGearMachine extends MechanicalMachine {
         final long outTorqueRaw = input.getTorqueRaw() * ratio;
 
         return RotationalPower.fromRaw(outSpeedRaw, outTorqueRaw, input.getDirection());
+    }
+
+    /** Точная дробь отношения (для проверки замкнутых контуров, раздел 11.2). */
+    @Override
+    public long[] getOutputRatioFraction(Direction outputSide) {
+        return outputSide == this.outputSide ? ratioFraction : null;
     }
 
     /**

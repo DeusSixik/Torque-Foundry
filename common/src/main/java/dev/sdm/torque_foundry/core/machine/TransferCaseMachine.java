@@ -21,6 +21,9 @@ public class TransferCaseMachine extends MechanicalMachine {
     private final Direction outputSideB;
     private final int ratioA;
     private final int ratioB;
+    /** Скоростные отношения выходов {ratio, 1} (кэш для контуров). */
+    private final long[] ratioFractionA;
+    private final long[] ratioFractionB;
 
     public TransferCaseMachine(Direction inputSide,
                                Direction outputSideA, int ratioA,
@@ -30,6 +33,8 @@ public class TransferCaseMachine extends MechanicalMachine {
         this.outputSideB = outputSideB;
         this.ratioA = Math.max(1, ratioA);
         this.ratioB = Math.max(1, ratioB);
+        this.ratioFractionA = new long[]{this.ratioA, 1};
+        this.ratioFractionB = new long[]{this.ratioB, 1};
         port(inputSide, PortRole.INPUT);
         port(outputSideA, PortRole.OUTPUT);
         port(outputSideB, PortRole.OUTPUT);
@@ -38,6 +43,18 @@ public class TransferCaseMachine extends MechanicalMachine {
     @Override
     protected void createDirections() {
         // Порты задаёт конструктор
+    }
+
+    /** Точная дробь отношения ветви (для проверки замкнутых контуров, 11.2). */
+    @Override
+    public long[] getOutputRatioFraction(Direction outputSide) {
+        if (outputSide == outputSideA) {
+            return ratioFractionA;
+        }
+        if (outputSide == outputSideB) {
+            return ratioFractionB;
+        }
+        return null;
     }
 
     @Override

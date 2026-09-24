@@ -16,6 +16,8 @@ public class BevelGearMachine extends MechanicalMachine {
     private final int teethOut;
     private final boolean reverses;
     private final Direction outputSide;
+    /** Скоростное отношение выхода {teethIn, teethOut}. */
+    private final long[] ratioFraction;
 
     public BevelGearMachine(int teethIn, int teethOut, boolean reverses,
                             Direction inputSide, Direction outputSide) {
@@ -24,6 +26,7 @@ public class BevelGearMachine extends MechanicalMachine {
         this.teethOut = Math.max(1, teethOut);
         this.reverses = reverses;
         this.outputSide = outputSide;
+        this.ratioFraction = new long[]{this.teethIn, this.teethOut};
         port(inputSide, PortRole.INPUT);
         port(outputSide, PortRole.OUTPUT);
     }
@@ -31,6 +34,12 @@ public class BevelGearMachine extends MechanicalMachine {
     @Override
     protected void createDirections() {
         // Порты задаёт конструктор
+    }
+
+    /** Точная дробь отношения (для проверки замкнутых контуров, раздел 11.2). */
+    @Override
+    public long[] getOutputRatioFraction(Direction outputSide) {
+        return outputSide == this.outputSide ? ratioFraction : null;
     }
 
     @Override
