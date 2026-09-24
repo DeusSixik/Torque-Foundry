@@ -7,13 +7,19 @@ package dev.sdm.torque_foundry.physics.machine;
  */
 public final class Bearing {
 
-    /** Скорость износа при работе НА рейтинге (доля за тик). */
+    /**
+     * Скорость износа при работе НА рейтинге (доля за тик).
+     */
     private static final double WEAR_PER_TICK = 2.0e-6;
 
-    /** Текущий тип опоры (NONE — точка пуста). */
+    /**
+     * Текущий тип опоры (NONE — точка пуста).
+     */
     private BearingType type = BearingType.NONE;
 
-    /** Износ 0..1: 0 — новый, 1 — отказ. */
+    /**
+     * Износ 0..1: 0 — новый, 1 — отказ.
+     */
     private double wear = 0.0;
 
     public BearingType type() {
@@ -29,7 +35,9 @@ public final class Bearing {
         this.wear = 0.0;
     }
 
-    /** Снятие опоры (гаечный ключ) — возвращает предметное состояние. */
+    /**
+     * Снятие опоры (гаечный ключ) — возвращает предметное состояние.
+     */
     public void remove() {
         this.type = BearingType.NONE;
         this.wear = 0.0;
@@ -39,12 +47,16 @@ public final class Bearing {
         return type != BearingType.NONE;
     }
 
-    /** Требует ли опора смазки (закрытый шариковый — нет). */
+    /**
+     * Требует ли опора смазки (закрытый шариковый — нет).
+     */
     public boolean needsLubrication() {
         return present() && type != BearingType.BALL;
     }
 
-    /** Полный износ — опора отказала. */
+    /**
+     * Полный износ — опора отказала.
+     */
     public boolean broken() {
         return present() && wear >= 1.0;
     }
@@ -72,17 +84,21 @@ public final class Bearing {
     }
 
     /**
-     * Множитель трения опоры. Здоровый смазанный — паспортный.
-     * Изношенный и сухой деградируют к «голому упору» (1.0) и выше;
-     * отказавшая опора — максимальные 1.8 (обломки скребут корпус).
+     * Множитель трения опоры. Здоровый смазанный — паспортный тип опоры,
+     * умноженный на фактор сорта смазки (&lt;1 — скользче). Изношенный и
+     * сухой деградируют к «голому упору» (1.0) и выше; отказавшая опора —
+     * максимальные 1.8 (обломки скребут корпус). На сухую свойства сорта
+     * не действуют: смазки нет — её множителей нет.
      *
-     * @param lubricated есть ли смазка в резервуаре
+     * @param lubricated      есть ли смазка в резервуаре
+     * @param lubricantFactor множитель трения сорта смазки (&gt; 0; на сухую — 1.0)
      */
-    public double frictionMultiplier(boolean lubricated) {
+    public double frictionMultiplier(boolean lubricated, double lubricantFactor) {
         if (!present()) {
             return 1.0;
         }
-        final double best = type.frictionMultiplier();
+        final double best = type.frictionMultiplier()
+                * (lubricated ? Math.max(0.05, lubricantFactor) : 1.0);
         double degradation = wear;
         if (needsLubrication() && !lubricated) {
             degradation = Math.max(degradation, 0.8);

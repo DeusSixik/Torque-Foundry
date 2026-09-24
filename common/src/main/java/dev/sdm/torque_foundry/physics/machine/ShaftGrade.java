@@ -9,21 +9,31 @@ package dev.sdm.torque_foundry.physics.machine;
  */
 public enum ShaftGrade {
 
-    /** Верстак: заметный перекос, трение +100%, износ +200%. */
+    /**
+     * Верстак: заметный перекос, трение +100%, износ +200%.
+     */
     C("c", 2.0),
 
-    /** Простой станок: трение +50%, износ +100%. */
+    /**
+     * Простой станок: трение +50%, износ +100%.
+     */
     B("b", 1.0),
 
-    /** Точный станок: трение +25%, износ +50%. */
+    /**
+     * Точный станок: трение +25%, износ +50%.
+     */
     A("a", 0.5),
 
-    /** Технологический станок: почти идеальная центровка. */
+    /**
+     * Технологический станок: почти идеальная центровка.
+     */
     S("s", 0.1);
 
     private final String serializedName;
 
-    /** Стартовый перекос вала, градусы. */
+    /**
+     * Стартовый перекос вала, градусы.
+     */
     private final double misalignmentDeg;
 
     ShaftGrade(String name, double misalignmentDeg) {
@@ -39,7 +49,9 @@ public enum ShaftGrade {
         return serializedName;
     }
 
-    /** Тир по имени компонента (дефолт — C). */
+    /**
+     * Тир по имени компонента (дефолт — C).
+     */
     public static ShaftGrade byName(String name) {
         for (ShaftGrade g : values()) {
             if (g.serializedName.equals(name)) {

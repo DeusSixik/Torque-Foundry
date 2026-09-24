@@ -89,4 +89,10 @@ public class PlanetaryGearMachine extends MechanicalMachine {
     public double getEfficiency() {
         return 0.97;
     }
+
+    /** Зубчатая ступень: на пределе температуры зуб выкрошен — заклинивает. */
+    @Override
+    public HeatFailureMode getHeatFailureMode() {
+        return HeatFailureMode.JAM;
+    }
 }

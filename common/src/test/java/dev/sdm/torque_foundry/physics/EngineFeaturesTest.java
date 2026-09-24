@@ -80,8 +80,40 @@ public class EngineFeaturesTest {
 
     @Test
     void efficiency_cutsTorqueAndHeatsMachine() {
+        // Потребитель требует 50 Nm при источнике 96 Nm и КПД узла 0.5:
+        // спрос 50 Nm стоит 100 Nm входа, из 96 доступных узел выдаёт
+        // не больше eta * вход = 48 Nm, а потерянная мощность греет узел.
+        // Источник с запасом (96 > 50 + трение) — сеть выходит на плато
+        // без пилы, выданный момент стабилен
         final MechanicalGroup group = new MechanicalGroup();
-        group.addElement(gen(256_000, 64_000, new BlockPos(0, 0, 0), RotationDirection.FORWARD));
+        group.addElement(gen(256_000, 96_000, new BlockPos(0, 0, 0), RotationDirection.FORWARD));
+        final LossyMachine lossy = new LossyMachine(0.5, new BlockPos(1, 0, 0));
+        group.addElement(lossy);
+        final ConsumerMachine consumer = new ConsumerMachine(1_000, 50_000, RotationDirection.FORWARD);
+        consumer.setBlockPos(new BlockPos(2, 0, 0));
+        group.addElement(consumer);
+
+        for (int t = 0; t < 100; t++) {
+            group.computeTick();
+        }
+
+        // Выдача ограничена КПД: 96 Nm * 0.5 = 48 Nm < спроса 50 Nm
+        assertEquals(48_000, consumer.getReceived().getTorqueRaw(), 500,
+                "efficiency 0.5 must cap delivered torque at eta * input");
+        // Потери: ~48 Nm на 256 RPM ~ 1.3 кВт, (1-eta)/eta ~ 1.3 кВт потерь
+        // -> ~65 Дж/тик, за 100 тиков узел гарантированно горячий
+        assertTrue(lossy.getSimulationState().getThermalEnergyJ() > 1000,
+                "lost power must heat the machine");
+    }
+
+    @Test
+    void efficiency_underDemand_costsInputNotOutput() {
+        // Спрос 10 Nm через узел с КПД 0.5: потребитель получает СВОЙ спрос
+        // целиком (узел передаёт то, что просят), а КПД проявляется на входе —
+        // источник обязан покрыть спрос / eta
+        final MechanicalGroup group = new MechanicalGroup();
+        final GeneratorMachine generator = gen(256_000, 64_000, new BlockPos(0, 0, 0), RotationDirection.FORWARD);
+        group.addElement(generator);
         final LossyMachine lossy = new LossyMachine(0.5, new BlockPos(1, 0, 0));
         group.addElement(lossy);
         final ConsumerMachine consumer = new ConsumerMachine(1_000, 10_000, RotationDirection.FORWARD);
@@ -92,12 +124,12 @@ public class EngineFeaturesTest {
             group.computeTick();
         }
 
-        // Потребитель получил ПОЛОВИНУ момента (64 -> 32 Nm)
-        assertEquals(32_000, consumer.getReceived().getTorqueRaw(), 500,
-                "efficiency 0.5 must halve transmitted torque");
-        // Потери (32 Nm * 26.8 рад/с ~ 857 Вт -> ~43 Дж/тик * 100 тиков) согрели узел
-        assertTrue(lossy.getSimulationState().getThermalEnergyJ() > 1000,
-                "lost power must heat the machine");
+        assertEquals(10_000, consumer.getReceived().getTorqueRaw(), 100,
+                "demand under the eta cap is granted in full");
+        assertEquals(WorkState.WORKING, consumer.getWorkState(),
+                "20 Nm input cost fits into 64 Nm source: chain works");
+        assertTrue(lossy.getSimulationState().getThermalEnergyJ() > 100,
+                "transmission through lossy node still heats it");
     }
 
     // --- 2. Конфликт направлений ---

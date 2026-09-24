@@ -3,7 +3,8 @@ package dev.sdm.torque_foundry.core.item;
 import dev.architectury.registry.registries.RegistrySupplier;
 import dev.sdm.torque_foundry.core.block.TFBlocks;
 import dev.sdm.torque_foundry.physics.machine.BearingType;
-import dev.sdm.torque_foundry.physics.machine.LubricantState;
+import dev.sdm.torque_foundry.physics.machine.LubricantKind;
+import dev.sdm.torque_foundry.physics.machine.LubricantKinds;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 
@@ -78,13 +79,16 @@ public final class TFItems {
         return null;
     }
 
-    /** Предмет -> тип смазки (null — предмет не смазка). */
-    public static LubricantState.Type lubricantOf(Item item) {
+    /**
+     * Предмет -> сорт смазки (null — предмет не смазка). Аддон-смазка
+     * мапится своим кодом на свой зарегистрированный {@link LubricantKind}.
+     */
+    public static LubricantKind lubricantOf(Item item) {
         if (item == LUBRICANT_GREASE.get()) {
-            return LubricantState.Type.GREASE;
+            return LubricantKinds.GREASE;
         }
         if (item == LUBRICANT_OIL.get()) {
-            return LubricantState.Type.OIL;
+            return LubricantKinds.OIL;
         }
         return null;
     }

@@ -84,7 +84,7 @@ public final class GroupSnapshotView {
     public double[] bearing0Wear = new double[0];
     public double[] bearing1Wear = new double[0];
 
-    /** Смазка: количество (0..CAPACITY) и ordinal типа LubricantState.Type. */
+    /** Смазка: количество (0..CAPACITY) и индекс сорта в реестре LubricantKinds. */
     public double[] lubricantAmount = new double[0];
     public byte[] lubricantType = new byte[0];
 

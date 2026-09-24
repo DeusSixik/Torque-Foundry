@@ -55,4 +55,10 @@ public class BevelGearMachine extends MechanicalMachine {
     public double getEfficiency() {
         return 0.96;
     }
+
+    /** Зубчатая ступень: на пределе температуры зуб выкрошен — заклинивает. */
+    @Override
+    public HeatFailureMode getHeatFailureMode() {
+        return HeatFailureMode.JAM;
+    }
 }

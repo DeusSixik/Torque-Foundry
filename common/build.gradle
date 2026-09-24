@@ -1,3 +1,9 @@
+plugins {
+    // JMH-бенчмарки физического солвера (hot path): sourceSet src/jmh/java,
+    // запуск — gradle :common:jmh
+    id 'me.champeau.jmh' version '0.7.3'
+}
+
 architectury {
     common rootProject.enabled_platforms.split(',')
 }
@@ -15,6 +21,14 @@ dependencies {
     // Unit tests for the physics simulation (pure JVM, no MC bootstrap)
     testImplementation platform("org.junit:junit-bom:5.10.2")
     testImplementation "org.junit.jupiter:junit-jupiter"
+
+    jmh "org.openjdk.jmh:jmh-core:1.37"
+    jmhAnnotationProcessor "org.openjdk.jmh:jmh-generator-annprocess:1.37"
+}
+
+jmh {
+    // -prof gc: бенчмарк zero-alloc кода обязан подтверждать alloc.rate.norm
+    profilers = ['gc']
 }
 
 test {

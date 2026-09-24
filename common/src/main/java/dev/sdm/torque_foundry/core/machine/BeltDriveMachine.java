@@ -49,4 +49,12 @@ public class BeltDriveMachine extends MechanicalMachine {
     public double getEfficiency() {
         return 0.92;
     }
+
+    /**
+     * Гибкая связь: на пределе температуры резина обуглена — ребро разомкнуто.
+     */
+    @Override
+    public HeatFailureMode getHeatFailureMode() {
+        return HeatFailureMode.OPEN_CIRCUIT;
+    }
 }

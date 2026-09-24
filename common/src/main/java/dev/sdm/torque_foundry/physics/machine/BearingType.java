@@ -7,7 +7,9 @@ package dev.sdm.torque_foundry.physics.machine;
  */
 public enum BearingType {
 
-    /** Пустая точка: вал держит только «голый упор» шасси. */
+    /**
+     * Пустая точка: вал держит только «голый упор» шасси.
+     */
     NONE(0, 1.0),
 
     /**
@@ -28,10 +30,14 @@ public enum BearingType {
      */
     BALL(2_500, 0.50);
 
-    /** Рейтинг оборотов, RPM: выше — износ подшипника. */
+    /**
+     * Рейтинг оборотов, RPM: выше — износ подшипника.
+     */
     private final int rpmRating;
 
-    /** Множитель трения узла у ЗДОРОВОГО смазанного подшипника. */
+    /**
+     * Множитель трения узла у ЗДОРОВОГО смазанного подшипника.
+     */
     private final double frictionMultiplier;
 
     BearingType(int rpmRating, double frictionMultiplier) {

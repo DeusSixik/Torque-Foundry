@@ -4,6 +4,7 @@ import dev.sdm.torque_foundry.api.physics.GroupSnapshotView;
 import dev.sdm.torque_foundry.physics.WorkState;
 import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import dev.sdm.torque_foundry.physics.machine.Bearing;
+import dev.sdm.torque_foundry.physics.machine.LubricantKinds;
 import dev.sdm.torque_foundry.physics.machine.LubricantState;
 import dev.sdm.torque_foundry.physics.machine.MechanicalMachine;
 import dev.sdm.torque_foundry.physics.machine.SimulationState;
@@ -115,7 +116,7 @@ public final class GroupSnapshot {
 
             final LubricantState lube = machine.getLubricant();
             lubricantAmount[i] = lube != null ? lube.amount() : 0.0;
-            lubricantType[i] = lube != null ? (byte) lube.type().ordinal() : -1;
+            lubricantType[i] = (byte) LubricantKinds.indexOf(lube != null ? lube.kind() : null);
 
             misalignmentDeg[i] = machine.getMisalignmentDeg();
             outputFactor[i] = machine.getOutputFactor();

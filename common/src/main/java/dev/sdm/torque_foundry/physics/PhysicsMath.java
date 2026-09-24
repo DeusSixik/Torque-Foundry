@@ -84,6 +84,59 @@ public final class PhysicsMath {
                 / (speedRaw * PhysicsConstants.PI2_60_NUM / PhysicsConstants.PI2_60_DEN);
     }
 
+    // --- Спрос через передачу (фазы B2/B3 решателя) ---
+
+    /**
+     * Переводит требуемый момент ребёнка с выходной стороны узла на входную:
+     * стоимость подачи этого спроса через механизм с передаточным числом
+     * и КПД. Используется фазами B2 (приведение спроса) и B3 (делёж входа).
+     *
+     * <p>Реализует сохранение мощности через передачу по формуле:
+     * <pre>
+     *   t_in = t_out · (s_out / s_in) / η
+     * </pre>
+     *
+     * <p>Где:
+     * <ul>
+     *   <li><b>t_in</b> — момент, который узел обязан снять со своего входа,
+     *       чтобы ребёнок получил свой спрос (milli-Nm);</li>
+     *   <li><b>t_out</b> — требуемый момент на стороне ребёнка (milli-Nm);</li>
+     *   <li><b>s_out</b> — обороты на стороне ребёнка, то есть скорость ребра
+     *       после transform узла (milli-RPM);</li>
+     *   <li><b>s_in</b> — обороты на входе узла (milli-RPM);</li>
+     *   <li><b>η</b> — КПД узла: потери обязан покрыть источник, поэтому
+     *       спрос делится на η, а не умножается на него.</li>
+     * </ul>
+     *
+     * <p>Сопоставление с аргументами: {@code t_out} &larr; {@code demandTorqueOutRaw},
+     * {@code s_out} &larr; {@code outputSpeedRaw}, {@code s_in} &larr; {@code inputSpeedRaw},
+     * {@code η} &larr; {@code efficiency}.
+     *
+     * <p>Переполнение: произведение милли-величин входит в long при моментах
+     * до ~10^10 milli-Nm и скоростях до ~10^9 milli-RPM — рабочие диапазоны
+     * движка (паспорт стали 266 000 Н·м = 2.66·10^8 milli-Nm) в запасе на
+     * несколько порядков.
+     *
+     * @param demandTorqueOutRaw требуемый момент на стороне ребёнка, milli-Nm, &ge; 0
+     * @param outputSpeedRaw     скорость ребра на стороне ребёнка, milli-RPM, &ge; 0
+     * @param inputSpeedRaw      скорость на входе узла, milli-RPM, &ge; 0
+     * @param efficiency         КПД узла (0, 1]; при &le; 0 принимается 0.01
+     * @return стоимость спроса на входной стороне узла, milli-Nm, &ge; 0
+     */
+    public static long childDemandToInputCost(long demandTorqueOutRaw, long outputSpeedRaw,
+                                              long inputSpeedRaw, double efficiency) {
+        if (demandTorqueOutRaw <= 0) {
+            return 0;
+        }
+        if (inputSpeedRaw <= 0) {
+            // Сеть стоит: отношение скоростей не определено (0/0).
+            // Отношение принимается единичным — остаётся деление на КПД.
+            return Math.round(demandTorqueOutRaw / Math.max(efficiency, 0.01));
+        }
+        final long ideal = demandTorqueOutRaw * outputSpeedRaw / inputSpeedRaw;
+        return Math.round(ideal / Math.max(efficiency, 0.01));
+    }
+
     // --- Трение ---
 
     /**

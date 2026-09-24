@@ -123,12 +123,16 @@ class PhysicsPipelineTest {
         pipeline.tick();
         pipeline.tick();
 
-        // Одна группа при 2 слотах: используется один слот.
+        // Одна группа при 2 слотах: используется один слот, группа тикает
+        // ровно раз за цикл. Барьер stop() (ждёт последний сабмит) делает
+        // подсчёт детерминированным: 2 тика с группой = 2 цикла = 2 тика.
         final MechanicalGroup group = groupOf(3);
         MechanicalGroupManager.register(group);
         pipeline.tick();
         pipeline.tick();
-        assertEquals(1, group.getSimTick());
+        pipeline.stop();
+        assertEquals(2, group.getSimTick(),
+                "single group with free slots: exactly one tick per cycle");
 
         pipeline.stop();
     }

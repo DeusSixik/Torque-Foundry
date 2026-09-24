@@ -51,14 +51,14 @@ public class BearingTest {
         b.install(BearingType.BALL);
         final boolean lubed = true;
 
-        final double fresh = b.frictionMultiplier(lubed);
+        final double fresh = b.frictionMultiplier(lubed, 1.0);
         // Имитируем износ до отказа
         for (int i = 0; i < 150_000; i++) {
             b.wearTick(10_000_000, 1.0); // в 4 раза выше рейтинга — износ быстрый
         }
         assertTrue(b.broken(), "overrated bearing must fail eventually");
         // Отказавшая опора скребёт корпус — ХУЖЕ голого упора
-        assertEquals(1.8, b.frictionMultiplier(lubed), 1e-9,
+        assertEquals(1.8, b.frictionMultiplier(lubed, 1.0), 1e-9,
                 "broken bearing = scraping metal");
         assertTrue(fresh < 0.6);
     }
@@ -88,7 +88,7 @@ public class BearingTest {
         s.installBearing(0, BearingType.ROLLER);
         s.installBearing(1, BearingType.ROLLER);
         final LubricantState lube = s.getLubricant();
-        assertEquals(100, lube.fill(LubricantState.Type.GREASE, 100), 1e-9);
+        assertEquals(100, lube.fill(dev.sdm.torque_foundry.physics.machine.LubricantKinds.GREASE, 100), 1e-9);
 
         final double start = lube.amount();
         // Симуляционные тики на 256 RPM (256000 milli-RPM)

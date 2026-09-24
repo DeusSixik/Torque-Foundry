@@ -8,6 +8,7 @@ import dev.sdm.torque_foundry.core.item.ShaftPartItem;
 import dev.sdm.torque_foundry.core.item.TFItems;
 import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.machine.BearingType;
+import dev.sdm.torque_foundry.physics.machine.LubricantKind;
 import dev.sdm.torque_foundry.physics.machine.LubricantState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -242,7 +243,7 @@ public class CaseBlock extends MechanicalBlock {
                 return ItemInteractionResult.sidedSuccess(level.isClientSide);
             }
 
-            final LubricantState.Type lube = TFItems.lubricantOf(stack.getItem());
+            final LubricantKind lube = TFItems.lubricantOf(stack.getItem());
             if (lube != null && !level.isClientSide) {
                 be.machine.getLubricant().fill(lube, LubricantState.CAPACITY);
                 stack.consume(1, player);

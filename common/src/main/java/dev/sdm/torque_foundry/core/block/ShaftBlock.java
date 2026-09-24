@@ -7,6 +7,7 @@ import dev.sdm.torque_foundry.core.data.MechanicalGroupManager;
 import dev.sdm.torque_foundry.core.item.TFItems;
 import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.machine.BearingType;
+import dev.sdm.torque_foundry.physics.machine.LubricantKind;
 import dev.sdm.torque_foundry.physics.machine.LubricantState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -177,8 +178,9 @@ public class ShaftBlock extends MechanicalBlock {
 
         // Статус узла: группа, перекос, опоры, смазка.
         // ВАЖНО: TranslatableContents принимает только Component|Number|Boolean|String —
-        // enum'ы (BearingType, LubricantState.Type) отдаём через .name(), иначе
-        // сервер роняет пакет useItemOn с IllegalArgumentException.
+        // перечисления и паспорта (BearingType, LubricantKind) отдаём строкой
+        // .name()/.id(), иначе сервер роняет пакет useItemOn с
+        // IllegalArgumentException.
         if (be != null && !level.isClientSide) {
             final dev.sdm.torque_foundry.physics.machine.Bearing a = be.machine.getBearing(0);
             final dev.sdm.torque_foundry.physics.machine.Bearing b = be.machine.getBearing(1);
@@ -190,7 +192,7 @@ public class ShaftBlock extends MechanicalBlock {
                     a.type().name(), Math.round(a.wear() * 100),
                     b.type().name(), Math.round(b.wear() * 100),
                     Math.round(lube.amount()), (int) LubricantState.CAPACITY,
-                    lube.type().name()), false);
+                    lube.kind().name()), false);
         }
         return super.useWithoutItem(blockState, level, blockPos, player, blockHitResult);
     }
@@ -229,7 +231,7 @@ public class ShaftBlock extends MechanicalBlock {
         }
 
         // Смазка: в резервуар машины
-        final LubricantState.Type lube = TFItems.lubricantOf(stack.getItem());
+        final LubricantKind lube = TFItems.lubricantOf(stack.getItem());
         if (lube != null && !level.isClientSide) {
             // Один предмет заполняет весь резервуар (упрощение первой итерации)
             be.machine.getLubricant().fill(lube, LubricantState.CAPACITY);

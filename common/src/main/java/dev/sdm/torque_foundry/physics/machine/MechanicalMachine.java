@@ -39,7 +39,9 @@ public class MechanicalMachine implements DebugInfoProvider {
         debugTransmissionSection(collector);
     }
 
-    /** Секция Machine: состояние, потребность, received, мощности тика. */
+    /**
+     * Секция Machine: состояние, потребность, received, мощности тика.
+     */
     private void debugMachineSection(DebugInfoCollector c) {
         final boolean alarm = workState == WorkState.JAMMED
                 || workState == WorkState.INSUFFICIENT_POWER;
@@ -60,7 +62,9 @@ public class MechanicalMachine implements DebugInfoProvider {
                         + sim.getChildrenWatts() + " W, free " + sim.getFreeWatts() + " W");
     }
 
-    /** Секция Material: физический паспорт материала машины. */
+    /**
+     * Секция Material: физический паспорт материала машины.
+     */
     private void debugMaterialSection(DebugInfoCollector c) {
         final PhysicsMaterial m = getMaterial();
         c.section("Material")
@@ -86,16 +90,21 @@ public class MechanicalMachine implements DebugInfoProvider {
                         "Игровые производные: вклад в инерцию сети, вязкое трение, масса детали");
     }
 
-    /** Секция Thermal: температура/тепло/ресурс из SimulationState. */
+    /**
+     * Секция Thermal: температура/тепло/ресурс из SimulationState.
+     */
     private void debugThermalSection(DebugInfoCollector c) {
         final SimulationState sim = getSimulationState();
         final PhysicsMaterial m = getMaterial();
         final double t = sim.temperatureC(m, m.nominalMassKg());
         final double overheat = sim.overheatingK(m, m.nominalMassKg());
+        final boolean broken = sim.isBrokenByHeat();
         c.section("Thermal")
                 .barAlertKey("Thermal.temp", "Temperature",
-                        String.format(Locale.ROOT, "%.1f C (overheat +%.1f K)", t, overheat),
-                        overheat > 60.0, (float) ((t - 20.0) / 80.0))
+                        (broken ? "BROKEN — needs part replacement — " : "")
+                                + String.format(Locale.ROOT, "%.1f C (overheat +%.1f K, limit %.0f C)",
+                                t, overheat, getMaxTemperatureC()),
+                        broken || overheat > 60.0, (float) ((t - 20.0) / 80.0))
                 .addKey("Thermal.energy", "Thermal energy",
                         String.format(Locale.ROOT, "%.1f J", sim.getThermalEnergyJ()))
                 .addKey("Thermal.throughput", "Throughput",
@@ -105,7 +114,9 @@ public class MechanicalMachine implements DebugInfoProvider {
                         "Счётчик ресурса: тики в INSUFFICIENT/JAMMED за жизнь детали");
     }
 
-    /** Секция Bearings: опоры/смазка/перекос — только у осевых машин. */
+    /**
+     * Секция Bearings: опоры/смазка/перекос — только у осевых машин.
+     */
     private void debugBearingsSection(DebugInfoCollector c) {
         if (!bearingSlots) {
             return;
@@ -119,13 +130,14 @@ public class MechanicalMachine implements DebugInfoProvider {
                 c.addKey(key, label, b.type() + " (bare)");
             } else if (b.broken()) {
                 c.barAlertKey(key, label, b.type()
-                        + String.format(Locale.ROOT, " BROKEN (%.0f%%)", b.wear() * 100),
+                                + String.format(Locale.ROOT, " BROKEN (%.0f%%)", b.wear() * 100),
                         true, (float) b.wear());
             } else {
                 c.barAlertKey(key, label, b.type() + String.format(Locale.ROOT,
                                 " %.0f%% worn, rating %d RPM, friction x%.2f",
                                 b.wear() * 100, b.type().rpmRating(),
-                                b.frictionMultiplier(getLubricant().available())),
+                                b.frictionMultiplier(lubricant.available(),
+                                        lubricant.kind().frictionFactor())),
                         b.wear() > 0.7, (float) b.wear());
             }
         }
@@ -133,16 +145,18 @@ public class MechanicalMachine implements DebugInfoProvider {
         final LubricantState lube = getLubricant();
         final float fill = (float) (lube.amount() / LubricantState.CAPACITY);
         c.barAlertKey("Bearings.lubricant", "Lubricant",
-                lube.type() + String.format(Locale.ROOT, " %.0f/%.0f (%.0f%%)%s",
+                lube.kind().name() + String.format(Locale.ROOT, " %.0f/%.0f (%.0f%%)%s",
                         lube.amount(), LubricantState.CAPACITY, fill * 100.0,
                         lube.available() ? "" : " [DRY]"),
-                !lube.available() && lube.type() != LubricantState.Type.NONE, fill);
+                !lube.available() && lube.kind() != LubricantKinds.NONE, fill);
         c.addKey("Bearings.alignment", "Misalignment / Friction / Wear",
                 String.format(Locale.ROOT, "+%.1f deg / x%.2f / x%.2f",
                         getMisalignmentDeg(), frictionMultiplier(0), wearFactor()));
     }
 
-    /** Секция Transmission: КПД/страгивание/холостой ход/инерция ротора. */
+    /**
+     * Секция Transmission: КПД/страгивание/холостой ход/инерция ротора.
+     */
     private void debugTransmissionSection(DebugInfoCollector c) {
         c.section("Transmission");
         final double eta = getEfficiency();
@@ -169,14 +183,18 @@ public class MechanicalMachine implements DebugInfoProvider {
         }
     }
 
-    /** Форматирование мощности для отладки (debug-качество, рендер-тред). */
+    /**
+     * Форматирование мощности для отладки (debug-качество, рендер-тред).
+     */
     protected static String fmtPower(RotationalPower power) {
         return String.format(Locale.ROOT, "%.3f RPM, %.3f Nm, dir=%s",
                 power.getSpeedRpm(), power.getTorqueNm(),
                 RotationDirection.from(power.getDirection()));
     }
 
-    /** Форматирование списка граней для отладки. */
+    /**
+     * Форматирование списка граней для отладки.
+     */
     protected static String fmtDirections(Direction[] directions) {
         if (directions == null || directions.length == 0) {
             return "-";
@@ -220,57 +238,61 @@ public class MechanicalMachine implements DebugInfoProvider {
 
     protected static final Direction[] EMPTY_DIRECTIONS = new Direction[0];
 
-    // required С…СЂР°РЅРёРј РєР°Рє RotationalPower вЂ” РїРµСЂРµРёСЃРїРѕР»СЊР·СѓРµРј РµРіРѕ SCALE-Р»РѕРіРёРєСѓ,
-    // Р° РЅРµ РґСѓР±Р»РёСЂСѓРµРј С„РѕСЂРјСѓР»С‹ РєРѕРЅРІРµСЂСЃРёРё С‚СѓС‚
+    // required храним как RotationalPower — переиспользуем его SCALE-логику,
+    // а не дублируем формулы конверсии тут
     protected final RotationalPower required;
-    protected final byte requiredDirection; // -1 = РЅР°РїСЂР°РІР»РµРЅРёРµ РЅРµ РІР°Р¶РЅРѕ
+    protected final byte requiredDirection; // -1 = направление не важно
     protected long groupIndex = -1;
     protected int groupElementIndex = -1;
 
     /**
-     * РЎРѕСЃС‚РѕСЏРЅРёРµ СЂР°Р±РѕС‚С‹, РІС‹С‡РёСЃР»СЏРµС‚СЃСЏ С„РёР·РёС‡РµСЃРєРёРј С‚РёРєРѕРј РіСЂСѓРїРїС‹.
+     * Состояние работы, вычисляется физическим тиком группы.
      */
     protected WorkState workState = WorkState.IDLE;
 
     /**
-     * РњРѕС‰РЅРѕСЃС‚СЊ СЃРµС‚Рё, РїРѕР»СѓС‡РµРЅРЅР°СЏ РјР°С€РёРЅРѕР№ РЅР° РїСЂРѕС€Р»РѕРј С„РёР·РёС‡РµСЃРєРѕРј С‚РёРєРµ.
+     * Мощность сети, полученная машиной на прошлом физическом тике.
      */
     protected final RotationalPower received = RotationalPower.fromRaw(0, 0);
 
     /**
-     * РЎРІРѕР±РѕРґРЅР°СЏ РјРѕС‰РЅРѕСЃС‚СЊ СѓР·Р»Р° (РІ РІР°С‚С‚Р°С…): received РјРёРЅСѓСЃ С‚СЂРµР±РѕРІР°РЅРёСЏ РґРµС‚РµР№.
-     * "РЎРєРѕР»СЊРєРѕ РѕСЃС‚Р°Р»РѕСЃСЊ РІ СЌС‚РѕРј СѓР·Р»Рµ РЅР° СЃРѕР±СЃС‚РІРµРЅРЅС‹Рµ РЅСѓР¶РґС‹".
+     * Свободная мощность узла (в ваттах): received минус требования детей.
+     * "Сколько осталось в этом узле на собственные нужды".
      */
     protected long freePower;
 
     /**
-     * РџРѕРєР°Р·Р°С‚РµР»Рё СЃРёРјСѓР»СЏС†РёРё (РјРѕС‰РЅРѕСЃС‚СЊ Р·Р° С‚РёРє, С‚РµРїР»Рѕ, СЃС‡С‘С‚С‡РёРєРё СЂРµСЃСѓСЂСЃР°).
+     * Показатели симуляции (мощность за тик, тепло, счётчики ресурса).
      */
     private final SimulationState simulationState = new SimulationState();
 
     /**
-     * РћРїРѕСЂРЅС‹Рµ С‚РѕС‡РєРё (РїРѕРґС€РёРїРЅРёРєРё) РјР°С€РёРЅС‹. РЈ РѕСЃРµРІС‹С… РјР°С€РёРЅ (РІР°Р») РёС… РґРІРµ вЂ”
-     * С‚РѕСЂС†С‹ РїРѕ РѕСЃРё; Сѓ РѕСЃС‚Р°Р»СЊРЅС‹С… РјР°С€РёРЅ СЃР»РѕС‚С‹ РЅРµР°РєС‚РёРІРЅС‹ Рё РЅР° С„РёР·РёРєСѓ
-     * РЅРµ РІР»РёСЏСЋС‚.
+     * Опорные точки (подшипники) машины. У осевых машин (вал) их две —
+     * торцы по оси; у остальных машин слоты неактивны и на физику
+     * не влияют.
      */
     private final Bearing[] bearings = {new Bearing(), new Bearing()};
 
-    /** Р РµР·РµСЂРІСѓР°СЂ СЃРјР°Р·РєРё (РѕР±С‰РёР№ РЅР° РјР°С€РёРЅСѓ). */
+    /**
+     * Резервуар смазки (общий на машину).
+     */
     private final LubricantState lubricant = new LubricantState();
 
     /**
-     * РџРµСЂРµРєРѕСЃ/РґРёСЃР±Р°Р»Р°РЅСЃ РІР°Р»Р°, РіСЂР°РґСѓСЃС‹ (РёР· С‚РёСЂР° Grade РїСЂРё РєСЂР°С„С‚Рµ).
-     * РњРЅРѕР¶РёС‚РµР»Рё С‚СЂРµРЅРёСЏ Рё РёР·РЅРѕСЃР°: 1 + РїРµСЂРµРєРѕСЃ Г— 0.5 / 1 + РїРµСЂРµРєРѕСЃ.
+     * Перекос/дисбаланс вала, градусы (из тира Grade при крафте).
+     * Множители трения и износа: 1 + перекос × 0.5 / 1 + перекос.
      */
     private double misalignmentDeg = 0.0;
 
-    /** Р•СЃС‚СЊ Р»Рё Р°РєС‚РёРІРЅС‹Рµ РѕРїРѕСЂРЅС‹Рµ С‚РѕС‡РєРё (РѕСЃРµРІР°СЏ РјР°С€РёРЅР°). */
+    /**
+     * Есть ли активные опорные точки (осевая машина).
+     */
     private boolean bearingSlots = false;
 
     /**
-     * Р›РѕРєР°Р»СЊРЅС‹Рµ РїРѕСЂС‚С‹ РјР°С€РёРЅС‹ (РІ СЃРёСЃС‚РµРјРµ РєРѕРѕСЂРґРёРЅР°С‚ Р±Р»РѕРєР° РїСЂРё РїРѕРІРѕСЂРѕС‚Рµ 0).
-     * Р—Р°РїРѕР»РЅСЏРµС‚СЃСЏ РІ {@link #createDirections()} С‡РµСЂРµР· {@link #port}.
-     * РњРёСЂРѕРІС‹Рµ РЅР°РїСЂР°РІР»РµРЅРёСЏ РїРѕР»СѓС‡Р°СЋС‚СЃСЏ РїРѕРІРѕСЂРѕС‚РѕРј РїРѕ {@link #facing}.
+     * Локальные порты машины (в системе координат блока при повороте 0).
+     * Заполняется в {@link #createDirections()} через {@link #port}.
+     * Мировые направления получаются поворотом по {@link #facing}.
      */
     private final Map<Direction, PortRole> localPorts = new EnumMap<>(Direction.class);
     private final Map<Direction, PortRole> worldPorts = new EnumMap<>(Direction.class);
@@ -278,31 +300,31 @@ public class MechanicalMachine implements DebugInfoProvider {
     private Direction[] outputDirections = EMPTY_DIRECTIONS;
 
     /**
-     * РџР°СЃСЃРёРІРЅР°СЏ РјР°С€РёРЅР° (РІР°Р»): РїСЂРёРЅРёРјР°РµС‚ РјРѕС‰РЅРѕСЃС‚СЊ РІС…РѕРґРЅС‹РјРё РіСЂР°РЅСЏРјРё
-     * Рё РѕС‚РґР°С‘С‚ С‡РµСЂРµР· РґСЂСѓРіРёРµ РіСЂР°РЅРё вЂ” РЅР°РїСЂР°РІР»РµРЅРёРµ РїРѕС‚РѕРєР° РѕРїСЂРµРґРµР»СЏРµС‚СЃСЏ
-     * РїРѕР»РѕР¶РµРЅРёРµРј РёСЃС‚РѕС‡РЅРёРєР°, Р° РЅРµ С„РёРєСЃРёСЂРѕРІР°РЅРЅС‹РјРё РїРѕСЂС‚Р°РјРё.
+     * Пассивная машина (вал): принимает мощность входными гранями
+     * и отдаёт через другие грани — направление потока определяется
+     * положением источника, а не фиксированными портами.
      */
     private boolean passive;
 
     /**
-     * РћСЃСЊ РјР°С€РёРЅС‹ (РґР»СЏ РѕСЃРµРІС‹С… РјР°С€РёРЅ: РІР°Р»).
+     * Ось машины (для осевых машин: вал).
      */
     protected Direction.Axis axis = Direction.Axis.X;
 
     /**
-     * РњР°С‚РµСЂРёР°Р» РґРµС‚Р°Р»РµР№ РјР°С€РёРЅС‹: РёРЅРµСЂС†РёСЏ (РїР»РѕС‚РЅРѕСЃС‚СЊ), С‚СЂРµРЅРёРµ, Р±РµР·РѕРїР°СЃРЅС‹Рµ РѕР±РѕСЂРѕС‚С‹.
+     * Материал деталей машины: инерция (плотность), трение, безопасные обороты.
      */
     private PhysicsMaterial material =
             PhysicsMaterials.IRON;
 
     /**
-     * РћСЂРёРµРЅС‚Р°С†РёСЏ Р±Р»РѕРєР°: РІ РєР°РєСѓСЋ РјРёСЂРѕРІСѓСЋ СЃС‚РѕСЂРѕРЅСѓ СЃРјРѕС‚СЂРёС‚ Р»РѕРєР°Р»СЊРЅС‹Р№ NORTH.
-     * РџРѕСЂС‚С‹, Р·Р°РґР°РЅРЅС‹Рµ РІ Р»РѕРєР°Р»СЊРЅС‹С… РєРѕРѕСЂРґРёРЅР°С‚Р°С…, РїРѕРІРѕСЂР°С‡РёРІР°СЋС‚СЃСЏ РІРјРµСЃС‚Рµ СЃ РЅРµР№.
+     * Ориентация блока: в какую мировую сторону смотрит локальный NORTH.
+     * Порты, заданные в локальных координатах, поворачиваются вместе с ней.
      */
     private Direction facing = Direction.NORTH;
 
     /**
-     * РџРѕР·РёС†РёСЏ Р±Р»РѕРєР°-РІР»Р°РґРµР»СЊС†Р° (null РґР»СЏ headless-РјР°С€РёРЅ РІРЅРµ РјРёСЂР°).
+     * Позиция блока-владельца (null для headless-машин вне мира).
      */
     protected BlockPos pos;
 
@@ -322,14 +344,14 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РСЃС‚РѕС‡РЅРёРє: РѕС‚РґР°С‘С‚ СЌРЅРµСЂРіРёСЋ (РІС…РѕРґРѕРІ РЅРµС‚, РІС‹С…РѕРґС‹ РµСЃС‚СЊ).
+     * Источник: отдаёт энергию (входов нет, выходы есть).
      */
     public boolean isSource() {
         return inputDirections.length == 0 && outputDirections.length > 0;
     }
 
     /**
-     * Р’С‹РґР°РІР°РµРјР°СЏ РјРѕС‰РЅРѕСЃС‚СЊ РёСЃС‚РѕС‡РЅРёРєР°. РќРµ РёСЃС‚РѕС‡РЅРёРє вЂ” null.
+     * Выдаваемая мощность источника. Не источник — null.
      */
     public RotationalPower getOutput() {
         return null;
@@ -368,7 +390,7 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РњРѕС‰РЅРѕСЃС‚СЊ СЃРµС‚Рё, РїРѕР»СѓС‡РµРЅРЅР°СЏ РјР°С€РёРЅРѕР№ (Р·Р°РїРѕР»РЅСЏРµС‚СЃСЏ С„РёР·РёС‡РµСЃРєРёРј С‚РёРєРѕРј).
+     * Мощность сети, полученная машиной (заполняется физическим тиком).
      */
     public RotationalPower getReceived() {
         return received;
@@ -379,7 +401,7 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РЎРІРѕР±РѕРґРЅР°СЏ РјРѕС‰РЅРѕСЃС‚СЊ СѓР·Р»Р° РІ РІР°С‚С‚Р°С… (received в€’ С‚СЂРµР±РѕРІР°РЅРёСЏ РґРµС‚РµР№).
+     * Свободная мощность узла в ваттах (received − требования детей).
      */
     public long getFreePower() {
         return freePower;
@@ -390,100 +412,167 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РўСЂР°РЅСЃС„РѕСЂРјР°С†РёСЏ РјРѕС‰РЅРѕСЃС‚Рё РїСЂРё РїРµСЂРµРґР°С‡Рµ С‡РµСЂРµР· РјР°С€РёРЅСѓ РІ РіСЂР°РЅСЊ outputSide.
-     * РљРѕСЂРѕР±РєРё РїРµСЂРµРґР°С‡/РїР»Р°РЅРµС‚Р°СЂРєРё/СЂРµРјРЅРё РјРµРЅСЏСЋС‚ СЃРѕРѕС‚РЅРѕС€РµРЅРёРµ RPM/Nm,
-     * РєРѕРЅРёС‡РµСЃРєРёРµ РїРѕРІРѕСЂР°С‡РёРІР°СЋС‚ РѕСЃСЊ Рё С‚.Рґ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ вЂ” passthrough.
+     * Трансформация мощности при передаче через машину в грань outputSide.
+     * Коробки передач/планетарки/ремни меняют соотношение RPM/Nm,
+     * конические поворачивают ось и т.д. По умолчанию — passthrough.
      *
-     * @param input      РјРѕС‰РЅРѕСЃС‚СЊ РЅР° РІС…РѕРґРµ РјР°С€РёРЅС‹
-     * @param outputSide РіСЂР°РЅСЊ, С‡РµСЂРµР· РєРѕС‚РѕСЂСѓСЋ РјРѕС‰РЅРѕСЃС‚СЊ РїРѕРєРёРґР°РµС‚ РјР°С€РёРЅСѓ
+     * @param input      мощность на входе машины
+     * @param outputSide грань, через которую мощность покидает машину
      */
     public RotationalPower transform(RotationalPower input, Direction outputSide) {
         return input;
     }
 
     /**
-     * Р‘Р°Р»Р°РЅСЃРѕРІС‹Р№ С…СѓРє РєРѕРЅС†Р° С„РёР·РёС‡РµСЃРєРѕРіРѕ С‚РёРєР°:Received вЂ” С‡С‚Рѕ РїСЂРёС€Р»Рѕ РІ СѓР·РµР»,
-     * childrenWatts вЂ” С‡С‚Рѕ СЃСѓРјРјР°СЂРЅРѕ С‚СЂРµР±СѓСЋС‚ РґРµС‚Рё (РІ РІР°С‚С‚Р°С…).
-     * Р­РЅРµСЂРіРѕР±СѓС„РµСЂС‹ (РјР°С…РѕРІРёРє) Р·РґРµСЃСЊ Р·Р°СЂСЏР¶Р°СЋС‚СЃСЏ РѕС‚ РёР·Р»РёС€РєР° Рё РїРѕРєСЂС‹РІР°СЋС‚ РґРµС„РёС†РёС‚.
-     * Р’С‹Р·С‹РІР°РµС‚СЃСЏ РІ РїРѕС‚РѕРєРµ С„РёР·РёРєРё.
+     * Балансовый хук конца физического тика:Received — что пришло в узел,
+     * childrenWatts — что суммарно требуют дети (в ваттах).
+     * Энергобуферы (маховик) здесь заряжаются от излишка и покрывают дефицит.
+     * Вызывается в потоке физики.
      */
     public void onNetworkTick(long receivedWatts, long childrenWatts) {
     }
 
     /**
-     * РљРџР” РїРµСЂРµРґР°С‡Рё С‡РµСЂРµР· РјР°С€РёРЅСѓ (1.0 вЂ” Р±РµР· РїРѕС‚РµСЂСЊ). РџРѕС‚РµСЂСЏРЅРЅР°СЏ РјРѕС‰РЅРѕСЃС‚СЊ
-     * P_loss = P_in В· (1-О·) СѓС…РѕРґРёС‚ РІ С‚РµРїР»Рѕ СѓР·Р»Р° (SimulationState).
+     * КПД передачи через машину (1.0 — без потерь). Потерянная мощность
+     * P_loss = P_in · (1-η) уходит в тепло узла (SimulationState).
      */
     public double getEfficiency() {
         return 1.0;
     }
 
     /**
-     * РњРѕРјРµРЅС‚ СЃС‚СЂР°РіРёРІР°РЅРёСЏ (milli-Nm): РІС…РѕРґРЅРѕРіРѕ РјРѕРјРµРЅС‚Р° РјРµРЅСЊС€Рµ вЂ” РјР°С€РёРЅР°
-     * РЅРµ С‚СЂРѕРЅРµС‚СЃСЏ Рё РєР»РёРЅРёС‚ СЃРµС‚СЊ. 0 вЂ” СЃС‚СЂР°РіРёРІР°РЅРёРµ РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ.
+     * Режим отказа узла от перегрева: на пределе температуры узел теряет
+     * ровно то свойство, которым держит нагрузку — и не больше (раздел 4
+     * документа физики). Отказ персистентный (SimulationState), сам не
+     * чинится — деталь меняет игрок.
+     */
+    public enum HeatFailureMode {
+        /**
+         * Узел не отказывает по температуре: генератор дерейтит момент,
+         * вал изнашивается по оборотам (ShaftWearHook) — у каждого свой закон.
+         */
+        NONE,
+        /**
+         * Зубчатая ступень: зуб выкрошен, ступень заклинивает — сеть встаёт,
+         * момент дальше не проводится.
+         */
+        JAM,
+        /**
+         * Гибкая связь: резина ремня обуглена, ребро разомкнуто до замены —
+         * шкивы живут своей жизнью, сеть продолжает крутиться.
+         */
+        OPEN_CIRCUIT
+    }
+
+    /**
+     * Что узел теряет на пределе температуры. По умолчанию — ничего:
+     * отказ по температуре задают только механизмы, чьё передаточное свойство
+     * способно сгореть или выкрошиться (зубчатые передачи — JAM, ремень —
+     * OPEN_CIRCUIT). Генератор, вал и потребитель отказывают по своим законам.
+     */
+    public HeatFailureMode getHeatFailureMode() {
+        return HeatFailureMode.NONE;
+    }
+
+    /**
+     * Предельная рабочая температура узла, °C: минимум из лимита материала
+     * паспорта и лимита заправленной смазки — смазка модифицирует узел
+     * (раздел 5.1): смазанная бронза отказывает по смазке раньше, чем по
+     * материалу.
+     *
+     * <p>Реализует расчет по формуле:
+     * <pre>
+     *   T_max = min(material.maxServiceTemperatureC, lubricant.type().maxTemperatureC())
+     * </pre>
+     *
+     * <p>Где:
+     * <ul>
+     *   <li><b>material.maxServiceTemperatureC()</b> — паспортный предел
+     *       материала (сталь 500, чугун 400, бронза 250, дерево 120 °C);</li>
+     *   <li><b>lubricant.kind().maxTemperatureC()</b> — предел заправленной
+     *       смазки (пластичная 120, минеральная 90 °C; NONE — бесконечность,
+     *       не ограничивает).</li>
+     * </ul>
+     *
+     * <p>Сопоставление с аргументами: метод аргументов не имеет, оба члена
+     * минимума — состояние машины ({@code material}, {@code lubricant}).
+     *
+     * @return предельная температура узла, °C, строго выше 20
+     */
+    public double getMaxTemperatureC() {
+        double limit = material.maxServiceTemperatureC();
+        if (lubricant.available()) {
+            limit = Math.min(limit, lubricant.kind().maxTemperatureC());
+        }
+        return limit;
+    }
+
+    /**
+     * Момент страгивания (milli-Nm): входного момента меньше — машина
+     * не тронется и клинит сеть. 0 — страгивание не требуется.
      */
     public long getBreakawayTorqueRaw() {
         return 0;
     }
 
     /**
-     * РџРѕС‚РµСЂРё С…РѕР»РѕСЃС‚РѕРіРѕ С…РѕРґР° (milli-Nm): РµСЃС‚ РјРѕРјРµРЅС‚ СЃРµС‚Рё, РїРѕРєР° РјР°С€РёРЅР°
-     * РІСЂР°С‰Р°РµС‚СЃСЏ (С‚СЂРµРЅРёРµ СЂР°Р±РѕС‡РµРіРѕ РѕСЂРіР°РЅР°, РІРµРЅС‚РёР»СЏС†РёСЏ). 0 вЂ” РЅРµС‚.
+     * Потери холостого хода (milli-Nm): ест момент сети, пока машина
+     * вращается (трение рабочего органа, вентиляция). 0 — нет.
      */
     public long getIdleTorqueRaw() {
         return 0;
     }
 
     /**
-     * Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅР°СЏ РёРЅРµСЂС†РёСЏ СЂРѕС‚РѕСЂР°/СЂР°Р±РѕС‡РµРіРѕ РѕСЂРіР°РЅР° (РІ РµРґРёРЅРёС†Р°С… РёРЅРµСЂС†РёРё
-     * СЃРµС‚Рё, РєР°Рє getInertia()): С‚СЏР¶С‘Р»С‹Р№ Р±Р°СЂР°Р±Р°РЅ Р·Р°РјРµРґР»СЏРµС‚ СЂР°Р·РіРѕРЅ СЃРµС‚Рё.
+     * Дополнительная инерция ротора/рабочего органа (в единицах инерции
+     * сети, как getInertia()): тяжёлый барабан замедляет разгон сети.
      */
     public double getExtraInertia() {
         return 0.0;
     }
 
     /**
-     * РўРёРє СЂР°Р±РѕС‚С‹ РРЎРўРћР§РќРРљРђ: РїРѕС‚РµСЂРё РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёСЏ РіСЂРµСЋС‚ СЂРѕС‚РѕСЂ,
-     * РїРµСЂРµРіСЂРµРІ СѓСЂРµР·Р°РµС‚ РІС‹РґР°С‡Сѓ (С‚РµРїР»РѕРІРѕР№ derate). Р’С‹Р·С‹РІР°РµС‚СЃСЏ РІ С„Р°Р·Рµ A
-     * РґР»СЏ РєР°Р¶РґРѕР№ РјР°С€РёРЅС‹ СЃ output != null.
+     * Тик работы ИСТОЧНИКА: потери преобразования греют ротор,
+     * перегрев урезает выдачу (тепловой derate). Вызывается в фазе A
+     * для каждой машины с output != null.
      *
-     * @param outputWatts РїР°СЃРїРѕСЂС‚РЅР°СЏ РјРѕС‰РЅРѕСЃС‚СЊ РёСЃС‚РѕС‡РЅРёРєР° РЅР° С‚РµРєСѓС‰РёС… РѕР±РѕСЂРѕС‚Р°С…, Р’С‚
+     * @param outputWatts паспортная мощность источника на текущих оборотах, Вт
      */
     public void onSourceTick(long outputWatts) {
     }
 
     /**
-     * РњРЅРѕР¶РёС‚РµР»СЊ РїР°СЃРїРѕСЂС‚РЅРѕРіРѕ РјРѕРјРµРЅС‚Р° РёСЃС‚РѕС‡РЅРёРєР° (С‚РµРїР»РѕРІРѕР№ derate, 0..1].
-     * РЎС‡РёС‚Р°РµС‚СЃСЏ РІ {@link #onSourceTick}, РїСЂРёРјРµРЅСЏРµС‚СЃСЏ РІ С„Р°Р·Рµ A.
+     * Множитель паспортного момента источника (тепловой derate, 0..1].
+     * Считается в {@link #onSourceTick}, применяется в фазе A.
      */
     public double getOutputFactor() {
         return 1.0;
     }
 
     /**
-     * РџРѕРєР°Р·Р°С‚РµР»Рё СЃРёРјСѓР»СЏС†РёРё (РјРѕС‰РЅРѕСЃС‚СЊ, С‚РµРїР»Рѕ, СЂРµСЃСѓСЂСЃ) вЂ” РјСѓС‚Р°Р±РµР»СЊРЅР°СЏ СЃС‚СЂСѓРєС‚СѓСЂР°,
-     * Р¶РёРІС‘С‚ РІ РјР°С€РёРЅРµ РІСЃС‘ РІСЂРµРјСЏ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёСЏ. РўРµРїР»Рѕ/РґРµРіСЂР°РґР°С†РёСЏ/Р±СѓС„РµСЂС‹ вЂ” С‡РёС‚Р°Р№
-     * Рё РїРёС€Рё СЃСЋРґР° РІРјРµСЃС‚Рѕ РЅРѕРІС‹С… РїРѕР»РµР№ РјР°С€РёРЅС‹.
+     * Показатели симуляции (мощность, тепло, ресурс) — мутабельная структура,
+     * живёт в машине всё время существования. Тепло/деградация/буферы — читай
+     * и пиши сюда вместо новых полей машины.
      */
     public SimulationState getSimulationState() {
         return simulationState;
     }
 
     /**
-     * РЎРёРјСѓР»СЏС†РёРѕРЅРЅС‹Р№ С‚РёРє РјР°С€РёРЅС‹: РЅР°РіСЂРµРІ С‚СЂРµРЅРёРµРј + РїР°СЃСЃРёРІРЅРѕРµ РѕС…Р»Р°Р¶РґРµРЅРёРµ,
-     * РёР·РЅРѕСЃ РїРѕРґС€РёРїРЅРёРєРѕРІ, СЂР°СЃС…РѕРґ СЃРјР°Р·РєРё. Р’С‹Р·С‹РІР°РµС‚СЃСЏ РєРѕРЅРІРµР№РµСЂРѕРј РІ С„Р°Р·Рµ
-     * РґРёРЅР°РјРёРєРё РґР»СЏ РІСЃРµС… РІСЂР°С‰Р°СЋС‰РёС…СЃСЏ РјР°С€РёРЅ. РџРµСЂРµРѕРїСЂРµРґРµР»СЏРµС‚СЃСЏ РґР»СЏ СЃРІРѕРµР№
-     * С‚РµРїР»РѕС„РёР·РёРєРё (РїРµС‡Рё, С‚РѕСЂРјРѕР·Р° Рё С‚.Рї.).
+     * Симуляционный тик машины: нагрев трением + пассивное охлаждение,
+     * износ подшипников, расход смазки. Вызывается конвейером в фазе
+     * динамики для всех вращающихся машин. Переопределяется для своей
+     * теплофизики (печи, тормоза и т.п.).
      *
-     * @param frictionTorqueMilliNm РјРѕРјРµРЅС‚ С‚СЂРµРЅРёСЏ СЌС‚РѕР№ РјР°С€РёРЅС‹, milli-Nm
-     * @param speedMilliRpm         РѕР±РѕСЂРѕС‚С‹, milli-RPM
+     * @param frictionTorqueMilliNm момент трения этой машины, milli-Nm
+     * @param speedMilliRpm         обороты, milli-RPM
      */
     public void onSimulationTick(long frictionTorqueMilliNm, long speedMilliRpm) {
         final double massKg = material.nominalMassKg();
         simulationState.addFrictionHeat(frictionTorqueMilliNm, speedMilliRpm);
         simulationState.coolTick(material, massKg);
 
-        // РР·РЅРѕСЃ РѕРїРѕСЂ + СЂР°СЃС…РѕРґ СЃРјР°Р·РєРё (С‚РѕР»СЊРєРѕ РѕСЃРµРІС‹Рµ РјР°С€РёРЅС‹ СЃРѕ СЃР»РѕС‚Р°РјРё)
+        // Износ опор + расход смазки (только осевые машины со слотами)
         if (bearingSlots) {
             final double wf = wearFactor();
             bearings[0].wearTick(speedMilliRpm, wf);
@@ -491,7 +580,7 @@ public class MechanicalMachine implements DebugInfoProvider {
 
             int lubricatedCount = 0;
             for (Bearing b : bearings) {
-                // Р—Р°РєСЂС‹С‚С‹Р№ С€Р°СЂРёРєРѕРІС‹Р№ СЃРјР°Р·РєРё РЅРµ С‚СЂРµР±СѓРµС‚
+                // Закрытый шариковый смазки не требует
                 if (b.present() && b.type() != BearingType.BALL) {
                     lubricatedCount++;
                 }
@@ -505,8 +594,8 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РњР°С€РёРЅР° СЏРІР»СЏРµС‚СЃСЏ РїСЂРѕС…РѕРґРЅС‹Рј СЃРµРіРјРµРЅС‚РѕРј РІР°Р»Р° (РїРѕР»РЅРѕС†РµРЅРЅС‹Р№ РІР°Р»-Р±Р»РѕРє
-     * РёР»Рё РІР°Р»-РІСЃС‚Р°РІРєР° С€Р°СЃСЃРё): РёР·РЅРѕСЃ РїРѕ РѕР±РѕСЂРѕС‚Р°Рј/РјРѕРјРµРЅС‚Сѓ РїСЂРёРјРµРЅСЏРµС‚СЃСЏ.
+     * Машина является проходным сегментом вала (полноценный вал-блок
+     * или вал-вставка шасси): износ по оборотам/моменту применяется.
      */
     public boolean isShaftSegment() {
         return false;
@@ -517,15 +606,15 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РњР°С€РёРЅР°-Р±СѓС„РµСЂ (РјР°С…РѕРІРёРє): РїРѕРєСЂС‹РІР°РµС‚ РїРёРєРѕРІС‹Р№ РґРµС„РёС†РёС‚ РјРѕРјРµРЅС‚Р° РёР· СЃРІРѕРµРіРѕ
-     * Р·Р°РїР°СЃР° вЂ” РїРµСЂРµРіСЂСѓР·РєР° РЅРµ РїРµСЂРµРґР°С‘С‚СЃСЏ РІРІРµСЂС… РїРѕ СЃРµС‚Рё, РїРѕРєР° РµСЃС‚СЊ СЂРµР·РµСЂРІ.
+     * Машина-буфер (маховик): покрывает пиковый дефицит момента из своего
+     * запаса — перегрузка не передаётся вверх по сети, пока есть резерв.
      */
     public boolean coversDeficitFromBuffer() {
         return false;
     }
 
     /**
-     * Р•СЃС‚СЊ Р»Рё СЃРµР№С‡Р°СЃ СЂРµР·РµСЂРІ Р±СѓС„РµСЂР° (РґР»СЏ РјР°С€РёРЅ СЃ coversDeficitFromBuffer).
+     * Есть ли сейчас резерв буфера (для машин с coversDeficitFromBuffer).
      */
     public boolean hasBufferReserve() {
         return false;
@@ -536,8 +625,8 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РћСЃСЊ РёР· blockstate (РІР°Р» Рё С‚.Рї.). РџР°СЃСЃРёРІРЅС‹Рµ РјР°С€РёРЅС‹ РїРµСЂРµРѕРїСЂРµРґРµР»СЏСЋС‚
-     * Рё РїРµСЂРµСЃС‚СЂР°РёРІР°СЋС‚ РїРѕСЂС‚С‹.
+     * Ось из blockstate (вал и т.п.). Пассивные машины переопределяют
+     * и перестраивают порты.
      */
     public void setAxis(Direction.Axis axis) {
         this.axis = axis;
@@ -553,19 +642,19 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РџСЂРёРІРµРґС‘РЅРЅР°СЏ РёРЅРµСЂС†РёСЏ РјР°С€РёРЅС‹ (РІРєР»Р°Рґ РІ СЂР°Р·РіРѕРЅ/С‚РѕСЂРјРѕР¶РµРЅРёРµ СЃРµС‚Рё):
-     * РїР»РѕС‚РЅРѕСЃС‚СЊ РјР°С‚РµСЂРёР°Р»Р°, РЅРѕСЂРјРёСЂРѕРІР°РЅРЅР°СЏ РѕС‚ СЃС‚Р°Р»Рё. Р’ Р±СѓРґСѓС‰РµРј вЂ” РѕР±СЉС‘Рј Рё
-     * СЂР°Р·РјРµСЂС‹ РґРµС‚Р°Р»РµР№ (СЂРµР°Р»СЊРЅС‹Р№ РјРѕРјРµРЅС‚ РёРЅРµСЂС†РёРё).
+     * Приведённая инерция машины (вклад в разгон/торможение сети):
+     * плотность материала, нормированная от стали. В будущем — объём и
+     * размеры деталей (реальный момент инерции).
      */
     public double getInertia() {
         return material.relativeDensity();
     }
 
     /**
-     * РњРѕРјРµРЅС‚ С‚СЂРµРЅРёСЏ РјР°С€РёРЅС‹ РїСЂРё Р·Р°РґР°РЅРЅС‹С… РѕР±РѕСЂРѕС‚Р°С… (milli-Nm):
-     * РІСЏР·РєРѕРµ С‚СЂРµРЅРёРµ РёР· СЂРµР°Р»СЊРЅРѕРіРѕ РєРѕСЌС„С„РёС†РёРµРЅС‚Р° Ој СЃ РјРЅРѕР¶РёС‚РµР»СЏРјРё РѕРїРѕСЂ
-     * (РїРѕРґС€РёРїРЅРёРєРё, СЃСѓС…РѕР№ С…РѕРґ, РїРµСЂРµРєРѕСЃ). РњРёРЅРёРјСѓРј 1 milli-Nm вЂ”
-     * С‡С‚РѕР±С‹ СЃРµС‚СЊ РІСЃРµРіРґР° РѕСЃС‚Р°РЅР°РІР»РёРІР°Р»Р°СЃСЊ С‚СЂРµРЅРёРµРј.
+     * Момент трения машины при заданных оборотах (milli-Nm):
+     * вязкое трение из реального коэффициента μ с множителями опор
+     * (подшипники, сухой ход, перекос). Минимум 1 milli-Nm —
+     * чтобы сеть всегда останавливалась трением.
      */
     public long getFrictionTorque(long speedRaw) {
         return PhysicsMath.viscousFrictionTorque(
@@ -573,46 +662,55 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РњРЅРѕР¶РёС‚РµР»СЊ С‚СЂРµРЅРёСЏ СѓР·Р»Р° РѕС‚ РѕРїРѕСЂ Рё РїРµСЂРµРєРѕСЃР°: РїСЂРѕРёР·РІРµРґРµРЅРёРµ РјРЅРѕР¶РёС‚РµР»РµР№
-     * РѕРїРѕСЂРЅС‹С… С‚РѕС‡РµРє Г— РїРµСЂРµРєРѕСЃ. Р‘РµР· Р°РєС‚РёРІРЅС‹С… СЃР»РѕС‚РѕРІ вЂ” С‚РѕР»СЊРєРѕ РїРµСЂРµРєРѕСЃ.
+     * Множитель трения узла от опор и перекоса: произведение множителей
+     * опорных точек × перекос. Смазанный узел получает фактор сорта смазки
+     * (паспорт сорта), сухой деградирует. Без активных слотов — только перекос.
      */
     public double frictionMultiplier(long speedRaw) {
         double m = 1.0;
         if (bearingSlots) {
             final boolean lubed = lubricant.available();
+            final double lubeFactor = lubricant.kind().frictionFactor();
             for (Bearing b : bearings) {
-                m *= b.frictionMultiplier(lubed);
+                m *= b.frictionMultiplier(lubed, lubeFactor);
             }
         }
-        // РџРµСЂРµРєРѕСЃ: РґРёСЃР±Р°Р»Р°РЅСЃ РјРµС€Р°РµС‚ РІСЂР°С‰РµРЅРёСЋ
+        // Перекос: дисбаланс мешает вращению
         m *= 1.0 + misalignmentDeg * 0.5;
         return m;
     }
 
     /**
-     * РњРЅРѕР¶РёС‚РµР»СЊ РёР·РЅРѕСЃР° СѓР·Р»Р° (РїРѕРґС€РёРїРЅРёРєРё): РїРµСЂРµРєРѕСЃ СѓСЃРєРѕСЂСЏРµС‚,
-     * СЃСѓС…РѕР№ С…РѕРґ СѓСЃРєРѕСЂСЏРµС‚ РІС‚СЂРѕРµ вЂ” РЅРѕ С‚РѕР»СЊРєРѕ РѕРїРѕСЂР°Рј, С‚СЂРµР±СѓСЋС‰РёРј СЃРјР°Р·РєРё.
+     * Множитель износа узла (подшипники): перекос ускоряет, сорт смазки
+     * смазанного узла — замедляет (паспорт сорта), сухой ход ускоряет
+     * втрое — но только опорам, требующим смазки.
      */
     public double wearFactor() {
         double w = 1.0 + misalignmentDeg;
-        if (bearingSlots && !lubricant.available()) {
-            boolean anyNeedsLube = false;
-            for (Bearing b : bearings) {
-                if (b.needsLubrication()) {
-                    anyNeedsLube = true;
-                    break;
+        if (bearingSlots) {
+            if (lubricant.available()) {
+                w *= lubricant.kind().wearFactor();
+            } else {
+                boolean anyNeedsLube = false;
+                for (Bearing b : bearings) {
+                    if (b.needsLubrication()) {
+                        anyNeedsLube = true;
+                        break;
+                    }
                 }
-            }
-            if (anyNeedsLube) {
-                w *= 3.0; // РЅР° СЃСѓС…СѓСЋ РёР·РЅРѕСЃ РІС‚СЂРѕРµ Р±С‹СЃС‚СЂРµРµ
+                if (anyNeedsLube) {
+                    w *= 3.0; // на сухую износ втрое быстрее
+                }
             }
         }
         return w;
     }
 
-    // --- РћРїРѕСЂС‹ Рё СЃРјР°Р·РєР° ---
+    // --- Опоры и смазка ---
 
-    /** РђРєС‚РёРІРёСЂСѓРµС‚ РѕРїРѕСЂРЅС‹Рµ СЃР»РѕС‚С‹ (РѕСЃРµРІР°СЏ РјР°С€РёРЅР°: РІР°Р»). */
+    /**
+     * Активирует опорные слоты (осевая машина: вал).
+     */
     protected void enableBearingSlots() {
         this.bearingSlots = true;
     }
@@ -625,19 +723,25 @@ public class MechanicalMachine implements DebugInfoProvider {
         return bearings[slot];
     }
 
-    /** РЈСЃС‚Р°РЅРѕРІРёС‚СЊ РїРѕРґС€РёРїРЅРёРє РІ С‚РѕС‡РєСѓ (РџРљРњ РїСЂРµРґРјРµС‚РѕРј). */
+    /**
+     * Установить подшипник в точку (ПКМ предметом).
+     */
     public void installBearing(int slot, BearingType type) {
         bearings[slot].install(type);
     }
 
-    /** РЎРЅСЏС‚СЊ РїРѕРґС€РёРїРЅРёРє РєР»СЋС‡РѕРј. Р’РѕР·РІСЂР°С‰Р°РµС‚ СЃРЅСЏС‚С‹Р№ С‚РёРї (РґР»СЏ РІС‹РїР°РґРµРЅРёСЏ). */
+    /**
+     * Снять подшипник ключом. Возвращает снятый тип (для выпадения).
+     */
     public BearingType removeBearing(int slot) {
         final BearingType t = bearings[slot].type();
         bearings[slot].remove();
         return t;
     }
 
-    /** РЎР»РѕРјР°РЅРЅС‹Р№ РїРѕРґС€РёРїРЅРёРє: С‚РѕС‡РєР° РѕРїСѓСЃС‚РµР»Р° СЃР°РјР° (РґР»СЏ РґСЂРѕРїР° РѕР±Р»РѕРјРєРѕРІ). */
+    /**
+     * Сломанный подшипник: точка опустела сама (для дропа обломков).
+     */
     public BearingType pollBrokenBearing(int slot) {
         if (bearings[slot].broken()) {
             final BearingType t = bearings[slot].type();
@@ -664,17 +768,17 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РћСЂРёРµРЅС‚Р°С†РёСЏ Р±Р»РѕРєР° РёР· blockstate (FACING): РїРѕРІРѕСЂР°С‡РёРІР°РµС‚ РїРѕСЂС‚С‹.
+     * Ориентация блока из blockstate (FACING): поворачивает порты.
      */
     public void setFacing(Direction facing) {
         this.facing = facing;
         rebuildWorldPorts();
     }
 
-    // --- РџРѕСЂС‚С‹ ---
+    // --- Порты ---
 
     /**
-     * Р РµРіРёСЃС‚СЂРёСЂСѓРµС‚ РїРѕСЂС‚ РІ Р›РћРљРђР›Р¬РќР«РҐ РєРѕРѕСЂРґРёРЅР°С‚Р°С… (РїСЂРё РїРѕРІРѕСЂРѕС‚Рµ Р±Р»РѕРєР° 0).
+     * Регистрирует порт в ЛОКАЛЬНЫХ координатах (при повороте блока 0).
      */
     protected void port(Direction localSide, PortRole role) {
         localPorts.put(localSide, role == null ? PortRole.NONE : role);
@@ -687,7 +791,7 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РџСЂСЏРјР°СЏ СѓСЃС‚Р°РЅРѕРІРєР° РњРР РћР’РћР“Рћ РїРѕСЂС‚Р° (РјРёРЅСѓСЏ РїРѕРІРѕСЂРѕС‚) вЂ” РґР»СЏ РѕСЃРµРІС‹С… РјР°С€РёРЅ (РІР°Р»).
+     * Прямая установка МИРОВОГО порта (минуя поворот) — для осевых машин (вал).
      */
     protected void worldPort(Direction worldSide, PortRole role) {
         worldPorts.put(worldSide, role == null ? PortRole.NONE : role);
@@ -700,7 +804,7 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * INPUT-РіСЂР°РЅСЊ (СѓС‡РёС‚С‹РІР°РµС‚СЃСЏ Рё IN_OUT вЂ” РїР°СЃСЃРёРІРЅС‹Р№ РїСЂРѕС…РѕРґРЅРѕР№ РїРѕСЂС‚).
+     * INPUT-грань (учитывается и IN_OUT — пассивный проходной порт).
      */
     public boolean isInputSide(Direction side) {
         final PortRole role = worldPorts.get(side);
@@ -708,7 +812,7 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * OUTPUT-РіСЂР°РЅСЊ (СѓС‡РёС‚С‹РІР°РµС‚СЃСЏ Рё IN_OUT).
+     * OUTPUT-грань (учитывается и IN_OUT).
      */
     public boolean isOutputSide(Direction side) {
         final PortRole role = worldPorts.get(side);
@@ -739,8 +843,8 @@ public class MechanicalMachine implements DebugInfoProvider {
     }
 
     /**
-     * РџРѕРІРѕСЂРѕС‚ Р»РѕРєР°Р»СЊРЅРѕРіРѕ РЅР°РїСЂР°РІР»РµРЅРёСЏ РІ РјРёСЂРѕРІРѕРµ РїРѕ РѕСЂРёРµРЅС‚Р°С†РёРё Р±Р»РѕРєР°
-     * (РІСЂР°С‰РµРЅРёРµ РІРѕРєСЂСѓРі Y: Р»РѕРєР°Р»СЊРЅС‹Р№ NORTH СЃРјРѕС‚СЂРёС‚ РІ СЃС‚РѕСЂРѕРЅСѓ facing).
+     * Поворот локального направления в мировое по ориентации блока
+     * (вращение вокруг Y: локальный NORTH смотрит в сторону facing).
      */
     private static Direction rotateLocalToWorld(Direction local, Direction facing) {
         if (local.getAxis() == Direction.Axis.Y) {
@@ -754,7 +858,7 @@ public class MechanicalMachine implements DebugInfoProvider {
         };
     }
 
-    // --- РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ (РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РјРµРЅРµРґР¶РµСЂРѕРј/С„РёР·РёРєРѕР№/РѕРІРµСЂР»РµРµРј) ---
+    // --- Совместимость (используется менеджером/физикой/оверлеем) ---
 
     public Direction[] getInputDirections() {
         return inputDirections;

@@ -41,4 +41,10 @@ public class GearboxMachine extends MechanicalMachine {
     public double getEfficiency() {
         return 0.95;
     }
+
+    /** Зубчатая ступень: на пределе температуры зуб выкрошен — заклинивает. */
+    @Override
+    public HeatFailureMode getHeatFailureMode() {
+        return HeatFailureMode.JAM;
+    }
 }

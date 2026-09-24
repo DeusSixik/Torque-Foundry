@@ -8,6 +8,12 @@ import net.minecraft.core.Direction;
 /**
  * Раздаточная коробка: один вход, два выхода с независимыми
  * передаточными числами (мосты с разными скоростями).
+ * <p>
+ * {@link #transform} задаёт только кинематику ветви (отношение и знак).
+ * Делёж момента входа между выходами делает решатель (фаза B3 группы):
+ * вход делится по спросу выходов, а не копируется на каждый — до этого
+ * каждый выход получал полную мощность входа и сеть удваивала энергию.
+ * Потери — на узле целиком один раз (КПД узла), а не на каждом ребре.
  */
 public class TransferCaseMachine extends MechanicalMachine {
 
@@ -57,5 +63,13 @@ public class TransferCaseMachine extends MechanicalMachine {
     @Override
     public double getEfficiency() {
         return 0.94;
+    }
+
+    /**
+     * Зубчатая ступень: на пределе температуры зуб выкрошен — заклинивает.
+     */
+    @Override
+    public HeatFailureMode getHeatFailureMode() {
+        return HeatFailureMode.JAM;
     }
 }

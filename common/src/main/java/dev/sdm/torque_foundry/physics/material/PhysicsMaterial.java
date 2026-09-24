@@ -63,7 +63,11 @@ public record PhysicsMaterial(
         /** Удельная теплоёмкость, J/(kg·K). Нагрев: ΔT = Q/(m·c). */
         double heatCapacityJPerKgK,
         /** Теплопроводность, W/(m·K). Отвод тепла. */
-        double thermalConductivityWPerMK
+        double thermalConductivityWPerMK,
+        /** Предельная рабочая температура узла, °C. Выше — узел теряет ровно то
+         *  свойство, которым держит нагрузку (раздел 4 документа физики).
+         *  Независимая паспортная константа: из прочности не выводится. */
+        double maxServiceTemperatureC
 ) {
 
     // --- Нормировочные константы игровой динамики ---
@@ -116,6 +120,13 @@ public record PhysicsMaterial(
         }
         if (heatCapacityJPerKgK <= 0 || thermalConductivityWPerMK <= 0) {
             throw new IllegalArgumentException("thermal properties must be positive: " + name);
+        }
+        if (maxServiceTemperatureC <= 20.0) {
+            // 20 C — AmbientTemperatureC из SimulationState (physics.machine);
+            // константа не импортируется, чтобы материал не зависел от машин
+            throw new IllegalArgumentException(
+                    "maxServiceTemperatureC must be above ambient 20 C, got "
+                            + maxServiceTemperatureC + ": " + name);
         }
     }
 
@@ -278,6 +289,7 @@ public record PhysicsMaterial(
         private double thermalExpansionPpmPerK = 12.0;
         private double heatCapacityJPerKgK = 490.0;
         private double thermalConductivityWPerMK = 45.0;
+        private double maxServiceTemperatureC = 500.0;
 
         // Оверрайды производных (null — считать автоматически)
         private Double customShearModulusGpa = null;
@@ -309,7 +321,8 @@ public record PhysicsMaterial(
                     .frictionCoefficient(0.40)
                     .thermalExpansionPpmPerK(5.0)
                     .heatCapacityJPerKgK(1700)
-                    .thermalConductivityWPerMK(0.17);
+                    .thermalConductivityWPerMK(0.17)
+                    .maxServiceTemperatureC(120);
         }
 
         /**
@@ -327,7 +340,8 @@ public record PhysicsMaterial(
                     .frictionCoefficient(0.16)
                     .thermalExpansionPpmPerK(18.0)
                     .heatCapacityJPerKgK(380)
-                    .thermalConductivityWPerMK(70);
+                    .thermalConductivityWPerMK(70)
+                    .maxServiceTemperatureC(250);
         }
 
         /**
@@ -345,7 +359,8 @@ public record PhysicsMaterial(
                     .frictionCoefficient(0.45)
                     .thermalExpansionPpmPerK(11.0)
                     .heatCapacityJPerKgK(460)
-                    .thermalConductivityWPerMK(52);
+                    .thermalConductivityWPerMK(52)
+                    .maxServiceTemperatureC(400);
         }
 
         public Builder(String name) {
@@ -407,6 +422,16 @@ public record PhysicsMaterial(
             return this;
         }
 
+        /**
+         * Предельная рабочая температура, °C: независимая табличная константа,
+         * из прочности не выводится. Сталь ~500 (отпуск зуба), чугун ~400,
+         * бронза ~250, дерево ~120 (обугливание).
+         */
+        public Builder maxServiceTemperatureC(double v) {
+            this.maxServiceTemperatureC = v;
+            return this;
+        }
+
         // --- Оверрайды производных ---
 
         /**
@@ -451,7 +476,8 @@ public record PhysicsMaterial(
                     densityKgM3, shearGpa, youngModulusGpa, poissonRatio,
                     yieldStrengthMpa, yieldShear, tensileStrengthMpa, fatigue, hardnessHb,
                     frictionCoefficient, thermalExpansionPpmPerK,
-                    heatCapacityJPerKgK, thermalConductivityWPerMK);
+                    heatCapacityJPerKgK, thermalConductivityWPerMK,
+                    maxServiceTemperatureC);
         }
     }
 }

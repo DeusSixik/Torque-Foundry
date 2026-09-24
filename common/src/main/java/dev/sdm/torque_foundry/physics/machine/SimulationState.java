@@ -21,15 +21,21 @@ import dev.sdm.torque_foundry.physics.material.PhysicsMaterial;
  */
 public final class SimulationState {
 
-    /** Температура окружающей среды (пещеры/незер — в будущем из биома). */
+    /**
+     * Температура окружающей среды (пещеры/незер — в будущем из биома).
+     */
     public static final double AMBIENT_TEMPERATURE_C = 20.0;
 
-    /** Конвекция: ватт охлаждения на кельвин разницы на килограмм массы.
-     *  Подобрана играбельно: постоянная времени = c/8 (сталь ~58 c, дерево ~212 c —
-     *  теплоёмкие материалы остывают дольше, как и в жизни). */
+    /**
+     * Конвекция: ватт охлаждения на кельвин разницы на килограмм массы.
+     * Подобрана играбельно: постоянная времени = c/8 (сталь ~58 c, дерево ~212 c —
+     * теплоёмкие материалы остывают дольше, как и в жизни).
+     */
     private static final double COOLING_W_PER_KG_K = 8.0;
 
-    /** Физических тиков в секунду (для перевода мощности в энергию). */
+    /**
+     * Физических тиков в секунду (для перевода мощности в энергию).
+     */
     private static final double TICKS_PER_SECOND = 20.0;
 
     // --- Мгновенные (за тик, ватты) ---
@@ -38,16 +44,32 @@ public final class SimulationState {
     private long freeWatts;
 
     // --- Накапливаемые ---
-    /** Накопленное тепло сверх окружающей среды, J. */
+    /**
+     * Накопленное тепло сверх окружающей среды, J.
+     */
     private double thermalEnergyJ;
 
-    /** Суммарная энергия, пропущенная через машину за жизнь, J. */
+    /**
+     * Суммарная энергия, пропущенная через машину за жизнь, J.
+     */
     private long totalThroughputJ;
 
-    /** Тиков перегруза (INSUFFICIENT/JAMMED) за жизнь — ресурсный счётчик. */
+    /**
+     * Тиков перегруза (INSUFFICIENT/JAMMED) за жизнь — ресурсный счётчик.
+     */
     private long overloadTicks;
 
-    /** Записать мгновенную мощность тика (вызывает конвейер). */
+    /**
+     * Узел отказал от перегрева (температура достигла предела). Персистентный:
+     * сам не чинится, сгоревшая накладка / выкрошенный зуб / обугленный ремень
+     * меняются игроком (см. раздел 4 документа физики). Сбрасывается только
+     * {@link #reset()} — заменой детали.
+     */
+    private boolean brokenByHeat;
+
+    /**
+     * Записать мгновенную мощность тика (вызывает конвейер).
+     */
     public void setTickPower(long receivedWatts, long childrenWatts, long freeWatts) {
         this.receivedWatts = receivedWatts;
         this.childrenWatts = childrenWatts;
@@ -86,7 +108,9 @@ public final class SimulationState {
         thermalEnergyJ += powerW / TICKS_PER_SECOND;
     }
 
-    /** Прямой подвод/отвод тепла (передача между машинами, нагрев среды). */
+    /**
+     * Прямой подвод/отвод тепла (передача между машинами, нагрев среды).
+     */
     public void addHeatJ(double joules) {
         thermalEnergyJ += joules;
         if (thermalEnergyJ < 0) {
@@ -122,17 +146,38 @@ public final class SimulationState {
         return AMBIENT_TEMPERATURE_C + thermalEnergyJ / (massKg * material.heatCapacityJPerKgK());
     }
 
-    /** Накопленное тепло сверх окружающей среды, J. */
+    /**
+     * Накопленное тепло сверх окружающей среды, J.
+     */
     public double getThermalEnergyJ() {
         return thermalEnergyJ;
     }
 
-    /** Перегрев над окружающей средой, K. */
+    /**
+     * Отмечает узел отказавшим от перегрева. Односторонний: обратной
+     * отметки нет, «само не чинится» — только замена детали ({@link #reset()}).
+     */
+    public void markBrokenByHeat() {
+        brokenByHeat = true;
+    }
+
+    /**
+     * Узел отказал от перегрева и ждёт замены детали.
+     */
+    public boolean isBrokenByHeat() {
+        return brokenByHeat;
+    }
+
+    /**
+     * Перегрев над окружающей средой, K.
+     */
     public double overheatingK(PhysicsMaterial material, double massKg) {
         return temperatureC(material, massKg) - AMBIENT_TEMPERATURE_C;
     }
 
-    /** Сброс тепла (ремонт/замена детали). */
+    /**
+     * Сброс тепла (ремонт/замена детали).
+     */
     public void resetThermal() {
         thermalEnergyJ = 0;
     }
@@ -151,7 +196,9 @@ public final class SimulationState {
         return overloadTicks;
     }
 
-    /** Полный сброс (машина заменена/отремонтирована). */
+    /**
+     * Полный сброс (машина заменена/отремонтирована).
+     */
     public void reset() {
         receivedWatts = 0;
         childrenWatts = 0;
@@ -159,5 +206,6 @@ public final class SimulationState {
         thermalEnergyJ = 0;
         totalThroughputJ = 0;
         overloadTicks = 0;
+        brokenByHeat = false;
     }
 }

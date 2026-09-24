@@ -33,7 +33,7 @@ public class WormGearMachine extends MechanicalMachine {
             return input;
         }
 
-        // Потери КПД учитывает applyEfficiency (getEfficiency) — без дубля
+        // Потери КПД учитывает решатель на узле (фаза B3, getEfficiency) — без дубля
         final long outSpeedRaw = input.getSpeedRaw() / ratio;
         final long outTorqueRaw = input.getTorqueRaw() * ratio;
 
@@ -46,5 +46,13 @@ public class WormGearMachine extends MechanicalMachine {
     @Override
     public double getEfficiency() {
         return 0.75;
+    }
+
+    /**
+     * Зубчатая ступень: на пределе температуры зуб выкрошен — заклинивает.
+     */
+    @Override
+    public HeatFailureMode getHeatFailureMode() {
+        return HeatFailureMode.JAM;
     }
 }
