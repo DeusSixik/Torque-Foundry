@@ -46,7 +46,7 @@ public class CycleConsistencyTest {
      */
     private static MechanicalGroup consistentRing(long genTorqueNm) {
         final MechanicalGroup g = new MechanicalGroup();
-        put(g, new GeneratorMachine(GEN_SPEED, genTorqueNm, RotationDirection.FORWARD), 0, 0);
+        put(g, TestRig.highGen(GEN_SPEED, genTorqueNm), 0, 0);
         put(g, new JunctionMachine(), 1, 0);
         put(g, new ShaftMachine(), 2, 0);
         put(g, new JunctionMachine(), 3, 0);
@@ -110,7 +110,7 @@ public class CycleConsistencyTest {
         // Две ветки с разными произведениями отношений сходятся в одном узле:
         // gen -> J1 -> [x2 -> J2] и J1 -> вверх [x3 -> J3 -> J4 -> J2]
         final MechanicalGroup g = new MechanicalGroup();
-        put(g, new GeneratorMachine(GEN_SPEED, 64_000, RotationDirection.FORWARD), 0, 0);
+        put(g, TestRig.highGen(GEN_SPEED, 64_000), 0, 0);
         put(g, new JunctionMachine(), 1, 0);
         put(g, new GearboxMachine(2, true, false, Direction.WEST, Direction.EAST), 2, 0);
         put(g, new JunctionMachine(), 3, 0);                     // узел встречи
@@ -137,7 +137,7 @@ public class CycleConsistencyTest {
         // Регрессия: обычная линейная сеть без колец не должна ловить
         // перенапряжение от проверки (пасsthrough-узлы дают 1/1)
         final MechanicalGroup g = new MechanicalGroup();
-        put(g, new GeneratorMachine(GEN_SPEED, 96_000, RotationDirection.FORWARD), 0, 0);
+        put(g, TestRig.highGen(GEN_SPEED, 96_000), 0, 0);
         put(g, new ShaftMachine(), 1, 0);
         put(g, new JunctionMachine(), 2, 0);
         put(g, new ShaftMachine(), 3, 0);

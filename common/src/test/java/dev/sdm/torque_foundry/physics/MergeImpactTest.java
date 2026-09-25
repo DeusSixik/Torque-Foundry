@@ -29,8 +29,7 @@ public class MergeImpactTest {
     private static MechanicalGroup spinUp(long speedRpm, long torqueNm, RotationDirection dir,
                                           int shafts, BlockPos origin) {
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(
-                speedRpm * 1000, torqueNm * 1000, dir);
+        final MechanicalMachine gen = TestRig.highGen(speedRpm * 1000, torqueNm * 1000, dir);
         gen.setBlockPos(origin);
         group.addElement(gen);
         for (int i = 1; i <= shafts; i++) {

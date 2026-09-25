@@ -65,7 +65,7 @@ public class EngineFeaturesTest {
     }
 
     private static GeneratorMachine gen(long speed, long torque, BlockPos pos, RotationDirection dir) {
-        final GeneratorMachine g = new GeneratorMachine(speed, torque, dir);
+        final GeneratorMachine g = TestRig.highGen(speed, torque, dir);
         g.setBlockPos(pos);
         return g;
     }
@@ -299,6 +299,7 @@ public class EngineFeaturesTest {
         final MechanicalGroup group = new MechanicalGroup();
         final GeneratorMachine gen = new GeneratorMachine(
                 256_000, 64_000, RotationDirection.FORWARD, 0.1, 100.0);
+        gen.setHighMode(true);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
         group.addElement(shaft(new BlockPos(1, 0, 0)));

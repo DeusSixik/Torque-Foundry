@@ -9,6 +9,7 @@ import dev.sdm.torque_foundry.physics.RotationalPower;
 import dev.sdm.torque_foundry.physics.machine.BearingType;
 import dev.sdm.torque_foundry.physics.machine.LubricantKind;
 import dev.sdm.torque_foundry.physics.machine.LubricantState;
+import dev.sdm.torque_foundry.physics.group.MechanicalGroup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -159,16 +160,26 @@ public class ShaftBlock extends MechanicalBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState blockState, Level level, BlockPos blockPos, Player player, BlockHitResult blockHitResult) {
-        final MechanicalBlockEntity be = (MechanicalBlockEntity) level.getBlockEntity(blockPos);
-
         if (player.isSecondaryUseActive()) {
             // Shift+ПКМ: следующий материал вала
             if (!level.isClientSide) {
                 final ShaftMaterial next = blockState.getValue(MATERIAL).next();
                 level.setBlock(blockPos, blockState.setValue(MATERIAL, next), Block.UPDATE_ALL);
-                // BE не пересоздаётся при смене свойства — обновляем машину сами
-                if (be != null) {
-                    be.machine.setMaterial(next.machine);
+                // BE не пересоздаётся при смене свойства — обновляем машину сами.
+                // Блок мог тихо смениться после setBlock (замена/откат): BE берём
+                // заново, а не кэшированную выше ссылку.
+                // На ходу — с сохранением энергии сети (раздел 5.1): деталь,
+                // потяжелев, роняет обороты всей сети, а не множит энергию.
+                if (level.getBlockEntity(blockPos) instanceof MechanicalBlockEntity fresh) {
+                    final MechanicalGroup group =
+                            MechanicalGroupManager.groupOf(fresh.machine);
+                    if (group != null) {
+                        group.swapMaterialPreservingEnergy(fresh.machine, next.machine);
+                        // Скорость и инерция сети изменились — свежий снапшот клиентам
+                        MechanicalGroupManager.markDirty(group.getGroupId());
+                    } else {
+                        fresh.machine.setMaterial(next.machine);
+                    }
                 }
                 player.displayClientMessage(Component.translatable(
                         "message.torque_foundry.shaft_material", next.getSerializedName()), true);
@@ -181,6 +192,7 @@ public class ShaftBlock extends MechanicalBlock {
         // перечисления и паспорта (BearingType, LubricantKind) отдаём строкой
         // .name()/.id(), иначе сервер роняет пакет useItemOn с
         // IllegalArgumentException.
+        final MechanicalBlockEntity be = (MechanicalBlockEntity) level.getBlockEntity(blockPos);
         if (be != null && !level.isClientSide) {
             final dev.sdm.torque_foundry.physics.machine.Bearing a = be.machine.getBearing(0);
             final dev.sdm.torque_foundry.physics.machine.Bearing b = be.machine.getBearing(1);

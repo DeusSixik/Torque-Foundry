@@ -91,8 +91,8 @@ public class MaterialWearTest {
         // сеть крутится, износ не рвёт рабочую линию
         final MechanicalGroup group = new MechanicalGroup();
 
-        final MechanicalMachine gen = new GeneratorMachine(
-                GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                GEN_SPEED, GEN_TORQUE);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
 

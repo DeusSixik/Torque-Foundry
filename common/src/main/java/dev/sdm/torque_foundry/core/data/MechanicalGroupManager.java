@@ -70,6 +70,18 @@ public final class MechanicalGroupManager {
     }
 
     /**
+     * Группа машины по её id (для действий игрока над сетью — например,
+     * смена материала вала с сохранением энергии).
+     *
+     * @param machine машина-участник
+     * @return группа или {@code null}, если машина вне сети
+     */
+    public static synchronized MechanicalGroup groupOf(MechanicalMachine machine) {
+        final long id = machine.getGroupIndex();
+        return id == -1 ? null : GROUPS_BY_ID.get(id);
+    }
+
+    /**
      * Снапшот групп для физического тика (снимается под блокировкой).
      * values() — живой view мапы: без копии в массив итерация
      * в потоке физики упадёт с CME при мутации с серверного треда.

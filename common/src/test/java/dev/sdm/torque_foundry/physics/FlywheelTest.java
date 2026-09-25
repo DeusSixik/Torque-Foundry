@@ -31,8 +31,8 @@ public class FlywheelTest {
     private static MechanicalGroup rig(long sourceTorqueNm, double flywheelInertia,
                                        long consumerTorqueNm) {
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(
-                256_000, sourceTorqueNm * 1000, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                256_000, sourceTorqueNm * 1000);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
 

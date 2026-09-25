@@ -77,8 +77,8 @@ public class HeatFailureTest {
      */
     private static MechanicalGroup chain(MechanicalMachine middle) {
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(
-                GEN_SPEED, 256_000, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                GEN_SPEED, 256_000);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
         middle.setBlockPos(new BlockPos(1, 0, 0));

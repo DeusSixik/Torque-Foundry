@@ -44,8 +44,8 @@ public class ReductionTest {
      *  Потребителя нет: чистый разгон инерцией и трением. */
     private static MechanicalGroup spinRig(boolean throughReducer, double flywheelInertia) {
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(
-                256_000, 64_000, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                256_000, 64_000);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
 
@@ -90,8 +90,8 @@ public class ReductionTest {
         // сеть x16 — разгон медленнее, чем с маховиком на базовом уровне
         final MechanicalGroup plain = spinRig(false, 160.0);
         final MechanicalGroup boosted = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(
-                256_000, 64_000, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                256_000, 64_000);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         boosted.addElement(gen);
         final GearboxMachine stepUp = new GearboxMachine(4, true, false,
@@ -118,8 +118,8 @@ public class ReductionTest {
         // в жёсткий клин (64 > 48), хотя приведённая нагрузка 16 Nm + трение
         // оставляют запас
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(
-                256_000, 48_000, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                256_000, 48_000);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
         final GearboxMachine box = new GearboxMachine(4, false, false,
@@ -145,8 +145,8 @@ public class ReductionTest {
         // u=4 даёт на выходе 32 RPM — потребитель 64 RPM не включается,
         // хотя раньше сеть формально «прошла» его порог 64 RPM
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(
-                128_000, 64_000, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                128_000, 64_000);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
         final GearboxMachine box = new GearboxMachine(4, false, false,

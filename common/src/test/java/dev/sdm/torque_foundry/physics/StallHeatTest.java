@@ -55,8 +55,8 @@ public class StallHeatTest {
 
     @Test
     void generator_stalled_heatsUp() {
-        final MechanicalGroup group = stalledRig(new GeneratorMachine(
-                256_000, 64_000, RotationDirection.FORWARD));
+        final MechanicalGroup group = stalledRig(TestRig.highGen(
+                256_000, 64_000));
         final MechanicalMachine gen = group.getMachine(0);
 
         // Клин: потребитель требует вдвое больше тяги — сеть встаёт сразу
@@ -97,8 +97,8 @@ public class StallHeatTest {
         // Рабочий генератор греется ТОЛЬКО потерями преобразования (7.18):
         // подвод тепла клина не должен работать на ходу
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(
-                256_000, 64_000, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                256_000, 64_000);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
         final ConsumerMachine consumer = new ConsumerMachine(

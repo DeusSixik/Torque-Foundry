@@ -38,6 +38,7 @@
   "message.torque_foundry.bearing_installed": "Bearing installed: %s (slot %s)",
   "message.torque_foundry.bearing_removed": "Bearing removed",
   "message.torque_foundry.lubricated": "Lubricated: %s",
+  "message.torque_foundry.generator_mode": "Generator mode: %s RPM",
 
   "itemGroup.torque_foundry.main": "Torque Foundry"
 }

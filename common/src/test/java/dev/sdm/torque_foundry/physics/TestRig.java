@@ -20,9 +20,25 @@ public final class TestRig {
     }
 
     public static MechanicalMachine generator(long speedRaw, long torqueRaw, BlockPos pos) {
-        final MechanicalMachine machine = new GeneratorMachine(speedRaw, torqueRaw, RotationDirection.FORWARD);
+        final MechanicalMachine machine = highGen(speedRaw, torqueRaw);
         machine.setBlockPos(pos);
         return machine;
+    }
+
+    /**
+     * Генератор в ВЫСОКОМ (паспортном) режиме: для тестов, где важны
+     * паспортные обороты. Умолчание движка — низкий режим (ниже предела
+     * дерева), явное переключение — как у игрока.
+     */
+    public static GeneratorMachine highGen(long speedRaw, long torqueRaw) {
+        return highGen(speedRaw, torqueRaw, RotationDirection.FORWARD);
+    }
+
+    /** Генератор в высоком режиме с направлением (встречные источники). */
+    public static GeneratorMachine highGen(long speedRaw, long torqueRaw, RotationDirection dir) {
+        final GeneratorMachine gen = new GeneratorMachine(speedRaw, torqueRaw, dir);
+        gen.setHighMode(true);
+        return gen;
     }
 
     public static MechanicalMachine shaft(BlockPos pos) {

@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DynamicsTest {
 
     private static MechanicalMachine generator(long speed, long torque, BlockPos pos) {
-        final MechanicalMachine m = new GeneratorMachine(speed, torque, RotationDirection.FORWARD);
+        final MechanicalMachine m = TestRig.highGen(speed, torque);
         m.setBlockPos(pos);
         return m;
     }

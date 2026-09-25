@@ -100,8 +100,8 @@ public class PowerBalanceTest {
         // а не 32 Nm: до конверсии фаза B2 складывала моменты с разных уровней
         final MechanicalGroup group = new MechanicalGroup();
 
-        final MechanicalMachine gen = new GeneratorMachine(
-                GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                GEN_SPEED, GEN_TORQUE);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
 
@@ -139,8 +139,8 @@ public class PowerBalanceTest {
         // (0.03·s·u²), слабый источник её не прокрутит
         final MechanicalGroup group = new MechanicalGroup();
 
-        final MechanicalMachine gen = new GeneratorMachine(
-                GEN_SPEED, 256_000, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                GEN_SPEED, 256_000);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
 
@@ -207,8 +207,8 @@ public class PowerBalanceTest {
     private MechanicalGroup branch(MechanicalMachine splitter, long torqueEast, long torqueNorth) {
         final MechanicalGroup group = new MechanicalGroup();
 
-        final MechanicalMachine gen = new GeneratorMachine(
-                GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(
+                GEN_SPEED, GEN_TORQUE);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
 

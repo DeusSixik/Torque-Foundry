@@ -121,6 +121,64 @@ public class MechanicalGroup {
         return index >= 0 && index < overstrainBuf.length && overstrainBuf[index];
     }
 
+    /**
+     * Смена материала детали на ходу с СОХРАНЕНИЕМ ЭНЕРГИИ сети (С1 п.8,
+     * раздел 5.1): блок, ставший тяжелее, при прежней скорости умножал
+     * кинетическую энергию сети из ничего. Новая скорость следует из старой
+     * инерции и новой — по всей сети, а не по одной детали.
+     *
+     * <p>Реализует расчет по формуле:
+     * <pre>
+     *   ω_новая = ω_старая · √(J_старая / J_новая)
+     *   J_новая = J_сети + (ρ_новая − ρ_старая) · u_узла²
+     * </pre>
+     *
+     * <p>Где:
+     * <ul>
+     *   <li><b>J_сети</b> — приведённая инерция сети с последнего тика;</li>
+     *   <li><b>ρ</b> — relativeDensity старого/нового паспорта;</li>
+     *   <li><b>u_узла</b> — скоростное отношение узла к базовому уровню
+     *       (последний тик): деталь за понижающей ступенью меняет инерцию
+     *       сети слабее;</li>
+     *   <li><b>ω</b> — обороты сети, milli-RPM.</li>
+     * </ul>
+     *
+     * <p>Стоячая сеть (клин, нет хода) считается стоящей: энергия нулевая,
+     * материал меняется свободно. Машина вне сети или в мёртвой ветви
+     * энергию сети не весит — тоже свободная смена.
+     *
+     * <p>Тредовый контракт: серверный тред (действие игрока).
+     *
+     * @param machine     машина, чей материал меняется; должна состоять
+     *                    в этой группе
+     * @param newMaterial новый паспорт материала
+     */
+    public void swapMaterialPreservingEnergy(@NotNull MechanicalMachine machine,
+                                             @NotNull dev.sdm.torque_foundry.physics.material.PhysicsMaterial newMaterial) {
+        final int idx = machine.getGroupElementIndex();
+        final dev.sdm.torque_foundry.physics.material.PhysicsMaterial old = machine.getMaterial();
+        if (old == newMaterial) {
+            return;
+        }
+        // Не в этой группе (или группа не тикала после добавления) —
+        // энергия сети не задета, простая смена
+        if (idx < 0 || idx >= size || machines[idx] != machine
+                || currentSpeedRaw == 0
+                || idx >= hasPowerBuf.length || !hasPowerBuf[idx]) {
+            machine.setMaterial(newMaterial);
+            return;
+        }
+
+        final double u = uNodeBuf[idx];
+        final double dJ = (newMaterial.relativeDensity() - old.relativeDensity()) * u * u;
+        final double jOld = Math.max(lastReducedInertia, 1.0);
+        final double jNew = Math.max(0.01, jOld + dJ);
+
+        machine.setMaterial(newMaterial);
+        lastReducedInertia = jNew;
+        currentSpeedRaw = Math.round(currentSpeedRaw * Math.sqrt(jOld / jNew));
+    }
+
     // --- Scratch-буферы тика (mutable-архитектура: ноль аллокаций в тике) ---
     // Переиспользуются между тиками, растут при росте группы.
     private int[] parentBuf = new int[0];

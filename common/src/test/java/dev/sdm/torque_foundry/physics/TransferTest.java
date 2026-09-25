@@ -32,7 +32,7 @@ public class TransferTest {
     @Test
     void chainTransfersPower() {
         final MechanicalGroup group = TestRig.line(
-                new GeneratorMachine(GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD),
+                TestRig.highGen(GEN_SPEED, GEN_TORQUE),
                 new MechanicalMachine[]{new ShaftMachine(), new ShaftMachine(), new ShaftMachine()},
                 new ConsumerMachine(CON_SPEED, CON_TORQUE, RotationDirection.FORWARD));
 
@@ -53,7 +53,7 @@ public class TransferTest {
     void noReverseEdges_doubleCount() {
         // Регрессия: BFS создавал обратное ребро и удваивал момент
         final MechanicalGroup group = TestRig.line(
-                new GeneratorMachine(GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD),
+                TestRig.highGen(GEN_SPEED, GEN_TORQUE),
                 new MechanicalMachine[]{new ShaftMachine(), new ShaftMachine()},
                 new ConsumerMachine(CON_SPEED, CON_TORQUE, RotationDirection.FORWARD));
 
@@ -93,7 +93,7 @@ public class TransferTest {
         final MechanicalGroup group = new MechanicalGroup();
 
         // Работающая ветка
-        final MechanicalMachine gen = new GeneratorMachine(GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(GEN_SPEED, GEN_TORQUE);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         final MechanicalMachine shaftMain = new ShaftMachine();
         shaftMain.setBlockPos(new BlockPos(1, 0, 0));
@@ -122,7 +122,7 @@ public class TransferTest {
         // Генератор -> Потребитель -> Вал: вал не питается через потребителя
         final MechanicalGroup group = new MechanicalGroup();
 
-        final MechanicalMachine gen = new GeneratorMachine(GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(GEN_SPEED, GEN_TORQUE);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
 
@@ -179,7 +179,7 @@ public class TransferTest {
     @Test
     void wrongDirectionConsumer() {
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine gen = new GeneratorMachine(GEN_SPEED, GEN_TORQUE, RotationDirection.FORWARD);
+        final MechanicalMachine gen = TestRig.highGen(GEN_SPEED, GEN_TORQUE);
         gen.setBlockPos(new BlockPos(0, 0, 0));
         group.addElement(gen);
 
@@ -196,8 +196,8 @@ public class TransferTest {
         // Регрессия: слияние двух источников в один потребитель.
         // RPM = max источников, момент = сумма.
         final MechanicalGroup group = new MechanicalGroup();
-        final MechanicalMachine genA = new GeneratorMachine(256_000, 64_000, RotationDirection.FORWARD);
-        final MechanicalMachine genB = new GeneratorMachine(128_000, 32_000, RotationDirection.FORWARD);
+        final MechanicalMachine genA = TestRig.highGen(256_000, 64_000);
+        final MechanicalMachine genB = TestRig.highGen(128_000, 32_000);
         final MechanicalMachine consumer = new ConsumerMachine(64_000, 32_000, RotationDirection.FORWARD);
 
         genA.setBlockPos(new BlockPos(0, 0, 0));

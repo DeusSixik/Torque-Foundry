@@ -110,8 +110,14 @@ public final class SimulationState {
 
     /**
      * Прямой подвод/отвод тепла (передача между машинами, нагрев среды).
+     *
+     * @param joules джоули сверх окружающей среды; неположительные значения
+     *               игнорируются — вычитанием управляет только конвекция
      */
     public void addHeatJ(double joules) {
+        if (!(joules > 0.0)) {
+            return;
+        }
         thermalEnergyJ += joules;
         if (thermalEnergyJ < 0) {
             thermalEnergyJ = 0;

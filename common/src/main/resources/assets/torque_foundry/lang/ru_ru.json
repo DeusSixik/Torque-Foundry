@@ -38,6 +38,7 @@
   "message.torque_foundry.bearing_installed": "Подшипник установлен: %s (точка %s)",
   "message.torque_foundry.bearing_removed": "Подшипник снят",
   "message.torque_foundry.lubricated": "Смазано: %s",
+  "message.torque_foundry.generator_mode": "Режим генератора: %s об/мин",
 
   "itemGroup.torque_foundry.main": "Torque Foundry"
 }

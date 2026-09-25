@@ -9,6 +9,17 @@ import net.minecraft.core.Direction;
  * Источник механической энергии: не имеет входов,
  * выдаёт мощность на все горизонтальные грани.
  *
+ * <p>ДВА РЕЖИМА (раздел 7.18), отличаются органом управления, а не предметом:
+ * <ul>
+ *   <li><b>Низкий (по умолчанию)</b> — обороты ниже предела дерева: стартовая
+ *       деревянная линия живёт без износа. Момент тот же — меньше мощность,
+ *       но на стартового потребителя хватает.</li>
+ *   <li><b>Высокий</b> — паспортные обороты; включается ТОЛЬКО явным
+ *       переключением (клик по блоку). Игрок, ничего не переключавший, не
+ *       ломает ничего; включивший высокий на деревянном валу ломает его сам
+ *       и видит, почему.</li>
+ * </ul>
+ *
  * <p>Тепловая модель (режим работы S1-S8 возникает сам, без таймеров):
  * потери преобразования (P_loss = P_out·(1-η)/η) греют ротор; при росте
  * температуры к пределу момент линейно derate'ится до пола. Перегруженный
@@ -17,7 +28,15 @@ import net.minecraft.core.Direction;
  */
 public class GeneratorMachine extends MechanicalMachine {
 
+    /**
+     * Обороты низкого режима, milli-RPM: ниже предела дерева (107 RPM) —
+     * деревянные валы не изнашиваются, момент при этом паспортный.
+     */
+    public static final long LOW_MODE_SPEED_RAW = 96_000;
+
     private final RotationalPower output;
+    /** Низкий режим: тот же момент, обороты ниже предела дерева. */
+    private final RotationalPower lowOutput;
 
     /** КПД преобразования в механику: потери греют ротор (0..1]. */
     private final double efficiency;
@@ -34,6 +53,12 @@ public class GeneratorMachine extends MechanicalMachine {
     /** Текущий множитель паспортного момента (считается в onSourceTick). */
     private double outputFactor = 1.0;
 
+    /**
+     * Режим выдачи: false — низкий (по умолчанию, ниже предела дерева),
+     * true — высокий (паспорт). Включается только явным переключением.
+     */
+    private boolean highMode;
+
     public GeneratorMachine(long outputSpeedRaw, long outputTorqueRaw, RotationDirection direction) {
         this(outputSpeedRaw, outputTorqueRaw, direction, 0.9, 110.0);
     }
@@ -44,11 +69,27 @@ public class GeneratorMachine extends MechanicalMachine {
         this.output = RotationalPower.fromRaw(outputSpeedRaw, outputTorqueRaw, direction);
         this.efficiency = Math.max(0.05, Math.min(1.0, efficiency));
         this.maxTemperatureC = maxTemperatureC;
+        this.lowOutput = RotationalPower.fromRaw(
+                Math.min(outputSpeedRaw, LOW_MODE_SPEED_RAW), outputTorqueRaw, direction);
+    }
+
+    /**
+     * Явное переключение режима (клик по блоку). Умолчание — низкий.
+     *
+     * @param high true — высокий (паспорт), false — низкий
+     */
+    public void setHighMode(boolean high) {
+        this.highMode = high;
+    }
+
+    /** Текущий режим выдачи: false — низкий, true — высокий (паспорт). */
+    public boolean isHighMode() {
+        return highMode;
     }
 
     @Override
     public RotationalPower getOutput() {
-        return output;
+        return highMode ? output : lowOutput;
     }
 
     @Override
@@ -62,12 +103,17 @@ public class GeneratorMachine extends MechanicalMachine {
     /**
      * Тик источника: потери греют ротор, температура диктует derate.
      * На нулевых оборотах потерь нет (P = τ·ω = 0) — генератор остывает.
+     *
+     * @param outputWatts паспортная мощность источника на текущих оборотах, Вт
      */
     @Override
     public void onSourceTick(long outputWatts) {
         if (outputWatts > 0) {
             final double lossWatts = outputWatts * (1.0 - efficiency) / efficiency;
-            getSimulationState().addHeatJ(lossWatts / 20.0);
+            // НОЛЬ на холодном ходу: нулевая выдача — нулевые потери
+            if (lossWatts > 0.0) {
+                getSimulationState().addHeatJ(lossWatts / 20.0);
+            }
         }
         final double t = getSimulationState().temperatureC(
                 getMaterial(), getMaterial().nominalMassKg());
